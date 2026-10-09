@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "编辑器核心逻辑（占位，依赖 editor-schema）",
+  "description": "时间线内核与 command 体系（依赖 design-schema）",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
@@ -29,7 +29,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@dt-ai-design/editor-schema": "workspace:*"
+    "@dt-ai-design/design-schema": "workspace:*"
   },
   "devDependencies": {
     "tsdown": "^0.23.0",

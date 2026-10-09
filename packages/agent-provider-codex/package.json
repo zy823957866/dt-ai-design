@@ -1,0 +1,39 @@
+{
+  "name": "@dt-ai-design/agent-provider-codex",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "接入层：不同模型（Codex 等）的适配器",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@dt-ai-design/agent-orchestrator": "workspace:*",
+    "@dt-ai-design/agent-protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "tsdown": "^0.23.0",
+    "typescript": "^6.0.3"
+  }
+}

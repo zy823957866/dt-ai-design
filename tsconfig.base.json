@@ -15,8 +15,18 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "paths": {
-      "@dt-ai-design/editor-schema": ["./packages/editor-schema/src/index.ts"],
-      "@dt-ai-design/editor-core": ["./packages/editor-core/src/index.ts"]
+      "@dt-ai-design/design-schema": ["./packages/design-schema/src/index.ts"],
+      "@dt-ai-design/editor-core": ["./packages/editor-core/src/index.ts"],
+      "@dt-ai-design/agent-protocol": [
+        "./packages/agent-protocol/src/index.ts"
+      ],
+      "@dt-ai-design/agent-runtime": ["./packages/agent-runtime/src/index.ts"],
+      "@dt-ai-design/agent-orchestrator": [
+        "./packages/agent-orchestrator/src/index.ts"
+      ],
+      "@dt-ai-design/agent-provider-codex": [
+        "./packages/agent-provider-codex/src/index.ts"
+      ]
     }
   }
 }

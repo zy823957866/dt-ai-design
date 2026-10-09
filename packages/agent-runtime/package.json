@@ -1,9 +1,9 @@
 {
-  "name": "@dt-ai-design/editor-schema",
+  "name": "@dt-ai-design/agent-runtime",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "编辑器 Schema 定义与基础类型",
+  "description": "运行时层：Agent 生命周期、消息队列、上下文管理",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
@@ -27,6 +27,10 @@
     "build": "tsdown",
     "dev": "tsdown --watch",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@dt-ai-design/agent-protocol": "workspace:*",
+    "@dt-ai-design/editor-core": "workspace:*"
   },
   "devDependencies": {
     "tsdown": "^0.23.0",

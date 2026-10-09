@@ -5,3 +5,8 @@ Recr
 Asar
 vite
 design
+design-schema
+agent-protocol
+agent-runtime
+agent-orchestrator
+agent-provider-codex
