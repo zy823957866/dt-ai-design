@@ -1,0 +1,53 @@
+import { defineConfig } from 'cz-git';
+
+export default defineConfig({
+  extends: ['@commitlint/config-conventional'],
+  prompt: {
+    alias: {
+      f: 'docs: 仅修改文档',
+      d: 'docs: 仅修改文档',
+      a: 'fix: 修改一个简单问题',
+      q: 'revert: 回滚到某次提交',
+    },
+    messages: {
+      type: '选择你要提交的类型:',
+      scope: '选择一个 scope（可选）:',
+      customScope: '请输入自定义的 scope:',
+      subject: '填写简短精炼的变更描述（必填）:',
+      body: '填写更加详细的变更描述（可选）:',
+      breaking: '列举非兼容性重大的变更（可选）:',
+      footerPrefixesSelect: '选择关联 issue 前缀（可选）:',
+      customFooterPrefix: '输入自定义 issue 前缀:',
+      footer: '列举此更改关联的 issue（可选）:',
+      confirmCommit: '是否提交或修改当前 commit ?',
+    },
+    types: [
+      { value: 'feat', name: 'feat:     新增功能' },
+      { value: 'fix', name: 'fix:      修复缺陷' },
+      { value: 'docs', name: 'docs:     文档变更' },
+      { value: 'style', name: 'style:    代码格式（不影响逻辑）' },
+      { value: 'refactor', name: 'refactor: 重构（既不是新增也不是修复）' },
+      { value: 'perf', name: 'perf:     性能优化' },
+      { value: 'test', name: 'test:     增加测试' },
+      { value: 'build', name: 'build:    构建流程、外部依赖变更' },
+      { value: 'ci', name: 'ci:       持续集成配置变更' },
+      { value: 'chore', name: 'chore:    其他杂项（构建脚本、工具）' },
+      { value: 'revert', name: 'revert:  回滚代码' },
+    ],
+    useEmoji: false,
+    scopes: [
+      'root',
+      'desktop',
+      'server',
+      'editor-core',
+      'editor-schema',
+      'deps',
+      'config',
+      'docs',
+      'ci',
+    ],
+    allowCustomScopes: true,
+    allowEmptyScopes: false,
+    maxSubjectLength: 72,
+  },
+});

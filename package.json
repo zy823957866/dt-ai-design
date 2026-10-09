@@ -1,0 +1,60 @@
+{
+  "name": "dt-ai-design",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@12.5.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "pnpm --filter @dt-ai-design/desktop start",
+    "dev": "pnpm --filter @dt-ai-design/desktop start",
+    "package": "pnpm --filter @dt-ai-design/desktop package",
+    "make": "pnpm --filter @dt-ai-design/desktop make",
+    "build": "pnpm build:packages && pnpm package",
+    "build:packages": "pnpm -r --filter \"./packages/**\" build",
+    "dev:packages": "pnpm -r --parallel --filter \"./packages/**\" dev",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint . && stylelint \"**/*.css\"",
+    "lint:fix": "eslint . --fix && stylelint \"**/*.css\" --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "commit": "git cz",
+    "prepare": "husky"
+  },
+  "config": {
+    "commitizen": {
+      "path": "cz-git"
+    }
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,mts,cts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{css,scss,less}": [
+      "stylelint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yaml,yml}": [
+      "prettier --write"
+    ]
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "@eslint/js": "^10.0.1",
+    "commitizen": "^4.3.2",
+    "cz-git": "^1.14.0",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "prettier": "^3.9.9",
+    "stylelint": "^17.16.0",
+    "stylelint-config-standard": "^40.0.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1"
+  }
+}
