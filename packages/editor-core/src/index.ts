@@ -1,11 +1,33 @@
-import { emptySchema, type EditorSchema } from '@dt-ai-design/design-schema';
-
-export type { EditorSchema } from '@dt-ai-design/design-schema';
-export { emptySchema } from '@dt-ai-design/design-schema';
-
-/**
- * 创建编辑器实例（占位实现）。
- */
-export function createEditor(schema: EditorSchema = emptySchema): EditorSchema {
-  return schema;
-}
+﻿export type { EditorState, Selection, Viewport, HistoryState } from './types';
+export type { Command } from './command';
+export { createEditorState } from './state';
+export { CommandStack } from './command';
+export {
+  addLayer,
+  removeLayer,
+  moveLayer,
+  resizeLayer,
+  setLayerProperty,
+  setLayersProperty,
+  moveLayerForward,
+  moveLayerBackward,
+  moveLayerToFront,
+  moveLayerToBack,
+  setSelection,
+  groupSelection,
+  ungroupSelection,
+  frameSelection,
+  duplicateLayer,
+  alignSelection,
+  distributeSelection,
+  type AlignDirection,
+  type DistributeDirection,
+} from './commands';
+export { zoomIn, zoomOut, zoomTo, pan, setViewport } from './viewport';
+export {
+  getSelectedLayers,
+  getSelectedBounds,
+  selectAll,
+  deselectAll,
+} from './selection';
+export { createEventEmitter, type EditorEventMap } from './events';

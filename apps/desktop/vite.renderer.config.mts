@@ -1,9 +1,18 @@
 import { defineConfig } from 'vite';
-import UnoCSS from 'unocss/vite';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // https://vitejs.dev/config
 export default defineConfig({
-  plugins: [UnoCSS()],
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   server: {
     port: 4700,
     strictPort: true,
