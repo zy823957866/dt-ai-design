@@ -1,0 +1,4 @@
+[mcp_servers.pencil]
+command = "D:\\tools\\other\\tools\\Pen\\resources\\app.asar.unpacked\\out\\mcp-server-windows-x64.exe"
+args = [ "--app", "desktop" ]
+env = {}
