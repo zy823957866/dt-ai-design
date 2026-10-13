@@ -709,7 +709,7 @@ export function Canvas() {
   return (
     <div
       ref={containerRef}
-      className="relative flex-1 overflow-hidden bg-bg-canvas"
+      className="relative flex-1 overflow-hidden bg-bg-canvas h-full"
       style={{ cursor: getCanvasCursor() }}
       onWheel={handleWheel}
     >
