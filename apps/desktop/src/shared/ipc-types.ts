@@ -55,17 +55,58 @@ export const IpcAppChannel = {
 
 // ─── AI 生成 ─────────────────────────────────────────────
 
-export interface GenerationProgress {
-  runId: string;
-  status: 'idle' | 'planning' | 'generating' | 'verifying' | 'done' | 'error';
-  message?: string;
-  progress: number;
+/** codex bash 命令执行活动（时间线展示用）。 */
+export interface GenerationActivity {
+  id: string;
+  kind: 'bash';
+  status: 'running' | 'completed' | 'failed';
+  input: { command: string };
+  output?: { summary: string };
+  error?: { code: string; message: string };
 }
+
+export type GenerationStage =
+  | 'planning'
+  | 'executing'
+  | 'validating'
+  | 'repairing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+/** main → renderer 的生成事件流。 */
+export type GenerationEvent =
+  | { type: 'stage'; runId: string; stage: GenerationStage; message?: string }
+  | { type: 'activity'; runId: string; activity: GenerationActivity }
+  | { type: 'message'; runId: string; text: string }
+  | {
+      type: 'document';
+      runId: string;
+      revision: number;
+      document: DesignDocument;
+    }
+  | {
+      type: 'done';
+      runId: string;
+      status: 'completed' | 'failed' | 'cancelled';
+      error?: string;
+    };
+
+export interface GenerationStartInput {
+  projectId: string;
+  prompt: string;
+  document: DesignDocument;
+  model?: string;
+}
+
+export type GenerationStartResult =
+  { success: true; runId: string } | { success: false; error: string };
 
 export const IpcGenerationChannel = {
   START: 'generation:start',
   CANCEL: 'generation:cancel',
-  PROGRESS: 'generation:progress',
+  RESET: 'generation:reset',
+  EVENT: 'generation:event',
 } as const;
 
 // ─── Preload API 类型 ────────────────────────────────────
@@ -91,13 +132,12 @@ export interface DesktopAPI {
 
   // Generation
   startGeneration: (
-    prompt: string,
-    document: DesignDocument,
-  ) => Promise<string>;
+    input: GenerationStartInput,
+  ) => Promise<GenerationStartResult>;
   cancelGeneration: (runId: string) => Promise<void>;
-  onGenerationProgress: (
-    callback: (progress: GenerationProgress) => void,
-  ) => () => void;
+  /** 丢弃项目的 AI 会话上下文，下次生成开新会话。 */
+  resetGenerationThread: (projectId: string) => Promise<void>;
+  onGenerationEvent: (callback: (event: GenerationEvent) => void) => () => void;
 }
 
 export interface OpenDialogOptions {

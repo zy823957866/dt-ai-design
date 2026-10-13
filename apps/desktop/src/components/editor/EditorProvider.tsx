@@ -28,6 +28,7 @@ import {
   ungroupSelection,
   frameSelection,
   duplicateLayer,
+  replaceDocument as replaceDocumentFn,
   zoomIn as zoomInFn,
   zoomOut as zoomOutFn,
   zoomTo as zoomToFn,
@@ -553,6 +554,23 @@ export function EditorProvider({
 
   // ─── 视口 ───
 
+  const handleReplaceDocument = useCallback(
+    (doc: DesignDocument) => {
+      const prev = stateRef.current.document;
+
+      const cmd = replaceDocumentFn(prev, doc);
+
+      stackRef.current.execute(cmd);
+
+      stateRef.current.selection = { layerIds: [] };
+
+      notifyChange();
+
+      notifySelectionChange();
+    },
+    [notifyChange, notifySelectionChange],
+  );
+
   const handleZoomIn = useCallback(() => {
     stateRef.current.viewport = zoomInFn(stateRef.current);
 
@@ -858,6 +876,8 @@ export function EditorProvider({
     alignSelection: handleAlignSelection,
 
     distributeSelection: handleDistributeSelection,
+
+    replaceDocument: handleReplaceDocument,
 
     zoomIn: handleZoomIn,
 

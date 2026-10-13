@@ -10,13 +10,18 @@ import {
   Layers,
   Search,
   StickyNote,
-  Plus,
   Sparkles,
   Image as ImageIcon,
   Paperclip,
-  Minus,
+  LoaderCircle,
+  X,
+  Check,
+  RotateCcw,
 } from 'lucide-react';
 import { useEditor } from '@/lib/editor';
+import { useGeneration } from '@/lib/useGeneration';
+import type { ChatTimelineItem } from '@/lib/useGeneration';
+import type { GenerationActivity } from '@/shared/ipc-types';
 
 type LeftTab = 'chat' | 'layers' | 'assets' | 'images';
 
@@ -24,6 +29,7 @@ interface LeftPanelProps {
   collapsed: boolean;
   onCollapse?: () => void;
   onExpand: () => void;
+  projectId?: string;
 }
 
 interface ContextMenuState {
@@ -40,7 +46,7 @@ const TABS: Array<{ id: LeftTab; label: string }> = [
   { id: 'images', label: 'Images' },
 ];
 
-export function LeftPanel({ collapsed, onExpand }: LeftPanelProps) {
+export function LeftPanel({ collapsed, onExpand, projectId }: LeftPanelProps) {
   const [activeTab, setActiveTab] = useState<LeftTab>('layers');
 
   if (collapsed) {
@@ -81,7 +87,7 @@ export function LeftPanel({ collapsed, onExpand }: LeftPanelProps) {
           ))}
         </div>
 
-        {activeTab === 'chat' && <ChatTab />}
+        {activeTab === 'chat' && <ChatTab projectId={projectId} />}
         {activeTab === 'layers' && <LayersTab />}
         {activeTab === 'assets' && <AssetsTab />}
         {activeTab === 'images' && <ImagesTab />}
@@ -108,73 +114,83 @@ function TabIcon({ id }: { id: LeftTab }) {
 // Chat Tab
 // ============================================================
 
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  time: string;
-}
+const STAGE_LABELS: Record<string, string> = {
+  planning: '正在规划…',
+  executing: '正在生成设计…',
+  validating: '正在校验文档结构…',
+  repairing: '正在修复校验错误…',
+  completed: '生成完成',
+  failed: '生成失败',
+  cancelled: '已停止',
+};
 
-const SAMPLE_MESSAGES: ChatMessage[] = [
-  {
-    id: 'm1',
-    role: 'user',
-    content: 'Make the cards more compact',
-    time: 'now',
-  },
-  {
-    id: 'm2',
-    role: 'assistant',
-    content: 'Done! Tightened the card grid and reduced padding.',
-    time: '2m ago',
-  },
-];
-
-function ChatTab() {
-  const [messages, setMessages] = useState<ChatMessage[]>(SAMPLE_MESSAGES);
+function ChatTab({ projectId }: { projectId?: string }) {
+  const { items, isRunning, error, start, cancel, reset } = useGeneration({
+    projectId,
+  });
   const [input, setInput] = useState('');
-  const [model] = useState('GPT-4o');
-  const [agentCount, setAgentCount] = useState(3);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // 时间线更新时滚动到底部
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [items, error]);
 
   const handleSend = () => {
-    if (!input.trim()) return;
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        role: 'user',
-        content: input.trim(),
-        time: 'now',
-      },
-    ]);
+    if (isRunning) return;
+    const text = input.trim();
+    if (!text) return;
     setInput('');
+    void start(text);
+  };
+
+  const toggleExpanded = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   return (
     <div className="flex h-full flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <div className="flex h-9 flex-1 items-center justify-between rounded-lg border border-border bg-bg-input px-3">
-          <span className="text-[12px] font-semibold text-text-primary">
-            Dashboard redesign
-          </span>
-          <ChevronDown className="h-[13px] w-[13px] shrink-0 text-text-muted" />
-        </div>
-        <button className="flex h-8 items-center gap-1 rounded-lg bg-accent px-2.5 text-[11px] font-semibold text-white">
-          <Plus className="h-3 w-3" />
-          New
-        </button>
-      </div>
-
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto min-h-0">
-        {messages.map((m) => (
-          <ChatBubble key={m.id} message={m} />
+      <div
+        ref={scrollRef}
+        className="flex flex-1 flex-col gap-3 overflow-y-auto min-h-0"
+      >
+        {items.length === 0 && !error && (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-soft">
+              <Sparkles className="h-4 w-4 text-accent" />
+            </div>
+            <p className="text-[12px] text-text-secondary">
+              描述你的设计需求，AI 会生成完整设计文档并落到画布。
+            </p>
+            <p className="text-[11px] text-text-muted">
+              例如：生成一个移动端登录页，包含 logo、输入框和登录按钮
+            </p>
+          </div>
+        )}
+        {items.map((item) => (
+          <TimelineItemView
+            key={item.id}
+            item={item}
+            expanded={expandedIds.has(item.id)}
+            onToggle={() => toggleExpanded(item.id)}
+          />
         ))}
+        {error && (
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11.5px] text-red-400">
+            {error}
+          </div>
+        )}
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-bg-input p-3">
+      <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-bg-input p-3">
         <textarea
-          ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -183,92 +199,170 @@ function ChatTab() {
               handleSend();
             }
           }}
-          placeholder="Ask the agent to modify your design…"
-          className="h-10 resize-none border-0 bg-transparent p-0 text-[12px] text-text-primary placeholder:text-text-muted outline-none"
+          disabled={isRunning}
+          placeholder={isRunning ? 'AI 正在生成中…' : '描述你的设计需求…'}
+          className="h-10 resize-none border-0 bg-transparent p-0 text-[12px] text-text-primary placeholder:text-text-muted outline-none disabled:opacity-60"
         />
         <div className="flex items-center gap-2.5">
-          <button className="text-text-muted hover:text-text-secondary">
+          <button
+            onClick={() => void reset()}
+            disabled={isRunning || items.length === 0}
+            className="text-text-muted hover:text-text-secondary disabled:opacity-40"
+            title="新会话（清空对话与上下文）"
+          >
+            <RotateCcw className="h-[14px] w-[14px]" />
+          </button>
+          <button
+            className="text-text-muted hover:text-text-secondary"
+            title="参考图片（即将支持）"
+          >
             <ImageIcon className="h-[14px] w-[14px]" />
           </button>
-          <button className="text-text-muted hover:text-text-secondary">
+          <button
+            className="text-text-muted hover:text-text-secondary"
+            title="附件（即将支持）"
+          >
             <Paperclip className="h-[14px] w-[14px]" />
           </button>
           <div className="flex-1" />
-          <button
-            onClick={handleSend}
-            className="flex h-[26px] w-8 items-center justify-center rounded-[13px] bg-accent text-white"
-          >
-            {/* arrow up */}
-            <svg
-              className="h-[11px] w-[11px]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          {isRunning ? (
+            <button
+              onClick={() => void cancel()}
+              className="flex h-[26px] w-8 items-center justify-center rounded-[13px] bg-red-500 text-white hover:bg-red-600"
+              title="停止生成"
             >
-              <line x1="12" y1="19" x2="12" y2="5" />
-              <polyline points="5 12 12 5 19 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <div className="flex h-[26px] items-center gap-1.5 rounded-[13px] bg-bg-input px-2.5">
-          <span className="text-[11px] font-semibold text-text-primary">
-            {model}
-          </span>
-          <ChevronDown className="h-2.5 w-2.5 text-text-muted" />
-        </div>
-        <div className="flex-1" />
-        <div className="flex items-center gap-[3px]">
-          <button
-            onClick={() => setAgentCount(Math.max(1, agentCount - 1))}
-            className="flex h-5 w-5 items-center justify-center rounded-md bg-bg-input text-text-muted hover:text-text-secondary"
-          >
-            <Minus className="h-2.5 w-2.5" />
-          </button>
-          <span className="w-5 text-center text-[11px] font-semibold text-text-primary">
-            {agentCount}
-          </span>
-          <button
-            onClick={() => setAgentCount(Math.min(5, agentCount + 1))}
-            className="flex h-5 w-5 items-center justify-center rounded-md bg-bg-input text-text-muted hover:text-text-secondary"
-          >
-            <Plus className="h-2.5 w-2.5" />
-          </button>
+              <Square className="h-[10px] w-[10px] fill-current" />
+            </button>
+          ) : (
+            <button
+              onClick={handleSend}
+              disabled={!input.trim()}
+              className="flex h-[26px] w-8 items-center justify-center rounded-[13px] bg-accent text-white disabled:opacity-40"
+              title="发送"
+            >
+              <svg
+                className="h-[11px] w-[11px]"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="12" y1="19" x2="12" y2="5" />
+                <polyline points="5 12 12 5 19 12" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function ChatBubble({ message }: { message: ChatMessage }) {
-  if (message.role === 'user') {
-    return (
-      <div className="flex justify-end">
-        <div className="max-w-[80%] rounded-xl bg-accent px-3 py-2 text-[11.5px] text-white">
-          {message.content}
+function TimelineItemView({
+  item,
+  expanded,
+  onToggle,
+}: {
+  item: ChatTimelineItem;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  switch (item.kind) {
+    case 'user':
+      return (
+        <div className="flex justify-end">
+          <div className="max-w-[80%] rounded-xl bg-accent px-3 py-2 text-[11.5px] text-white">
+            {item.text}
+          </div>
         </div>
-      </div>
-    );
+      );
+    case 'assistant':
+      return (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-accent">
+              <Sparkles className="h-[11px] w-[11px] text-white" />
+            </div>
+            <span className="text-[11px] font-semibold text-text-primary">
+              Assistant
+            </span>
+          </div>
+          <div className="whitespace-pre-wrap rounded-xl bg-bg-elevated px-3 py-2 text-[12.5px] text-text-secondary">
+            {item.text}
+          </div>
+        </div>
+      );
+    case 'activity':
+      return (
+        <ActivityRow
+          activity={item.activity}
+          expanded={expanded}
+          onToggle={onToggle}
+        />
+      );
+    case 'stage':
+      return (
+        <div className="flex items-center gap-2 px-1">
+          {item.spin ? (
+            <LoaderCircle className="h-3 w-3 shrink-0 animate-spin text-text-muted" />
+          ) : (
+            <span className="h-1 w-1 shrink-0 rounded-full bg-text-muted" />
+          )}
+          <span className="text-[11px] text-text-muted">
+            {STAGE_LABELS[item.message] ?? item.message}
+          </span>
+        </div>
+      );
   }
+}
+
+function ActivityRow({
+  activity,
+  expanded,
+  onToggle,
+}: {
+  activity: GenerationActivity;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const hasOutput = Boolean(activity.output?.summary || activity.error);
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-accent">
-          <Sparkles className="h-[11px] w-[11px] text-white" />
-        </div>
-        <span className="text-[11px] font-semibold text-text-primary">
-          Assistant
+    <div className="rounded-lg border border-border bg-bg-elevated/60">
+      <button
+        onClick={hasOutput ? onToggle : undefined}
+        className={`flex w-full items-start gap-2 px-2.5 py-2 text-left ${
+          hasOutput ? 'cursor-pointer hover:bg-bg-hover' : 'cursor-default'
+        }`}
+      >
+        <span className="mt-[2px] shrink-0">
+          {activity.status === 'running' ? (
+            <LoaderCircle className="h-3 w-3 animate-spin text-accent" />
+          ) : activity.status === 'completed' ? (
+            <Check className="h-3 w-3 text-green-500" />
+          ) : (
+            <X className="h-3 w-3 text-red-400" />
+          )}
         </span>
-        <span className="text-[10.5px] text-text-muted">{message.time}</span>
-      </div>
-      <div className="rounded-xl bg-bg-elevated px-3 py-2 text-[12.5px] text-text-secondary">
-        {message.content}
-      </div>
+        <span className="min-w-0 flex-1 truncate font-mono text-[10.5px] leading-[16px] text-text-secondary">
+          $ {activity.input.command}
+        </span>
+        {hasOutput && (
+          <ChevronRight
+            className={`mt-[2px] h-3 w-3 shrink-0 text-text-muted transition-transform ${
+              expanded ? 'rotate-90' : ''
+            }`}
+          />
+        )}
+      </button>
+      {expanded && hasOutput && (
+        <div className="border-t border-border px-2.5 py-2">
+          <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap break-all font-mono text-[10px] leading-relaxed text-text-muted">
+            {activity.error ? activity.error.message : activity.output?.summary}
+          </pre>
+        </div>
+      )}
     </div>
   );
 }

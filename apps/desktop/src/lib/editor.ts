@@ -57,6 +57,10 @@ export interface EditorApi {
   alignSelection: (direction: AlignDirection) => void;
   distributeSelection: (direction: DistributeDirection) => void;
 
+  // ─── 文档 ───
+  /** 整体替换文档（AI 生成结果应用，可撤销）。 */
+  replaceDocument: (doc: DesignDocument) => void;
+
   // ─── 视口 ───
   zoomIn: () => void;
   zoomOut: () => void;

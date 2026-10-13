@@ -6,10 +6,22 @@ import {
   IpcGenerationChannel,
   type OpenDialogOptions,
   type SaveDialogOptions,
+  type GenerationStartInput,
 } from '../shared/ipc-types';
 import * as projectStore from './projectStore';
 import * as settingsStore from './settings';
+import { GenerationRuntime } from './generationRuntime';
 import type { DesignDocument } from '@dt-ai-design/design-schema';
+
+let generationRuntime: GenerationRuntime | null = null;
+
+/** 懒创建生成运行时（首次调用时 app 已 ready）。 */
+function getGenerationRuntime(): GenerationRuntime {
+  if (!generationRuntime) {
+    generationRuntime = new GenerationRuntime({ app });
+  }
+  return generationRuntime;
+}
 
 /**
  * 注册所有 IPC 处理器
@@ -94,25 +106,23 @@ export function registerIpcHandlers(): void {
     },
   );
 
-  // ─── AI 生成（占位） ───────────────────────────────────
+  // ─── AI 生成 ───────────────────────────────────────────
 
   ipcMain.handle(
     IpcGenerationChannel.START,
-    async (_event, _prompt: string, _document: DesignDocument) => {
-      void _event;
-      void _prompt;
-      void _document;
-      // TODO: Phase 8 实现
-      return `run_${Date.now()}`;
+    async (event, input: GenerationStartInput) => {
+      return getGenerationRuntime().start(event.sender, input);
     },
   );
 
+  ipcMain.handle(IpcGenerationChannel.CANCEL, async (_event, runId: string) => {
+    getGenerationRuntime().cancel(runId);
+  });
+
   ipcMain.handle(
-    IpcGenerationChannel.CANCEL,
-    async (_event, _runId: string) => {
-      void _event;
-      void _runId;
-      // TODO: Phase 8 实现
+    IpcGenerationChannel.RESET,
+    async (_event, projectId: string) => {
+      getGenerationRuntime().resetThread(projectId);
     },
   );
 }

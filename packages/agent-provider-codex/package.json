@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "@dt-ai-design/agent-provider-codex",
   "version": "0.0.0",
   "private": true,
@@ -29,7 +29,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@dt-ai-design/agent-orchestrator": "workspace:*",
     "@dt-ai-design/agent-protocol": "workspace:*",
     "@dt-ai-design/agent-runtime": "workspace:*"
   },

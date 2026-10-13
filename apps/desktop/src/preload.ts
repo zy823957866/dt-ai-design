@@ -7,7 +7,8 @@ import {
   type DesktopAPI,
   type OpenDialogOptions,
   type SaveDialogOptions,
-  type GenerationProgress,
+  type GenerationEvent,
+  type GenerationStartInput,
 } from './shared/ipc-types';
 import type { DesignDocument } from '@dt-ai-design/design-schema';
 
@@ -52,19 +53,22 @@ const api: DesktopAPI = {
 
   // ─── AI 生成 ───────────────────────────────────────────
 
-  startGeneration: (prompt: string, document: DesignDocument) =>
-    ipcRenderer.invoke(IpcGenerationChannel.START, prompt, document),
+  startGeneration: (input: GenerationStartInput) =>
+    ipcRenderer.invoke(IpcGenerationChannel.START, input),
 
   cancelGeneration: (runId: string) =>
     ipcRenderer.invoke(IpcGenerationChannel.CANCEL, runId),
 
-  onGenerationProgress: (callback) => {
-    const handler = (_event: unknown, progress: GenerationProgress) => {
-      callback(progress);
+  resetGenerationThread: (projectId: string) =>
+    ipcRenderer.invoke(IpcGenerationChannel.RESET, projectId),
+
+  onGenerationEvent: (callback) => {
+    const handler = (_event: unknown, generationEvent: GenerationEvent) => {
+      callback(generationEvent);
     };
-    ipcRenderer.on(IpcGenerationChannel.PROGRESS, handler);
+    ipcRenderer.on(IpcGenerationChannel.EVENT, handler);
     return () => {
-      ipcRenderer.removeListener(IpcGenerationChannel.PROGRESS, handler);
+      ipcRenderer.removeListener(IpcGenerationChannel.EVENT, handler);
     };
   },
 };

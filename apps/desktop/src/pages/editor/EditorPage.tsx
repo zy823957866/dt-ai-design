@@ -73,6 +73,7 @@ export default function EditorPage() {
               collapsed={leftCollapsed}
               onCollapse={() => setLeftCollapsed(true)}
               onExpand={() => setLeftCollapsed(false)}
+              projectId={project?.id}
             />
 
             <div className="relative flex flex-1 overflow-hidden">

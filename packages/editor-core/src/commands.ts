@@ -10,6 +10,7 @@ import type {
   RectangleLayer,
 } from '@dt-ai-design/design-schema';
 import type { EditorState, Selection } from './types';
+import type { Command } from './command';
 
 /** 图层类型字符串 */
 type LayerTypeString =
@@ -673,6 +674,25 @@ export function duplicateLayer(
   return {
     document: doc,
     selection: { layerIds: newIds },
+  };
+}
+
+// ─── 整体替换文档（AI 生成结果应用） ─────────────────────────
+
+/**
+ * 用新文档整体替换当前文档（可撤销，Cmd+Z 可回滚 AI 改动）。
+ *
+ * @param prev 替换前的文档（用于 undo）
+ * @param next 替换后的文档
+ */
+export function replaceDocument(
+  prev: DesignDocument,
+  next: DesignDocument,
+): Command {
+  return {
+    name: 'replaceDocument',
+    execute: () => next,
+    undo: () => prev,
   };
 }
 

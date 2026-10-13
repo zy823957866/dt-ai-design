@@ -20,6 +20,7 @@ export {
   duplicateLayer,
   alignSelection,
   distributeSelection,
+  replaceDocument,
   appendFill,
   updateFill,
   removeFill,

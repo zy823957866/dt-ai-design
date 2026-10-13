@@ -30,7 +30,9 @@
   },
   "dependencies": {
     "@dt-ai-design/agent-protocol": "workspace:*",
-    "@dt-ai-design/agent-runtime": "workspace:*"
+    "@dt-ai-design/agent-provider-codex": "workspace:*",
+    "@dt-ai-design/agent-runtime": "workspace:*",
+    "@dt-ai-design/design-schema": "workspace:*"
   },
   "devDependencies": {
     "tsdown": "^0.23.0",

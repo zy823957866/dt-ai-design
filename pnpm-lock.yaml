@@ -214,6 +214,18 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@dt-ai-design/agent-orchestrator':
+        specifier: workspace:*
+        version: link:../../packages/agent-orchestrator
+      '@dt-ai-design/agent-protocol':
+        specifier: workspace:*
+        version: link:../../packages/agent-protocol
+      '@dt-ai-design/agent-provider-codex':
+        specifier: workspace:*
+        version: link:../../packages/agent-provider-codex
+      '@dt-ai-design/agent-runtime':
+        specifier: workspace:*
+        version: link:../../packages/agent-runtime
       '@dt-ai-design/canvas-ruler':
         specifier: workspace:*
         version: link:../../packages/canvas-ruler
@@ -386,9 +398,15 @@ importers:
       '@dt-ai-design/agent-protocol':
         specifier: workspace:*
         version: link:../agent-protocol
+      '@dt-ai-design/agent-provider-codex':
+        specifier: workspace:*
+        version: link:../agent-provider-codex
       '@dt-ai-design/agent-runtime':
         specifier: workspace:*
         version: link:../agent-runtime
+      '@dt-ai-design/design-schema':
+        specifier: workspace:*
+        version: link:../design-schema
     devDependencies:
       tsdown:
         specifier: ^0.23.0
@@ -408,9 +426,6 @@ importers:
 
   packages/agent-provider-codex:
     dependencies:
-      '@dt-ai-design/agent-orchestrator':
-        specifier: workspace:*
-        version: link:../agent-orchestrator
       '@dt-ai-design/agent-protocol':
         specifier: workspace:*
         version: link:../agent-protocol
