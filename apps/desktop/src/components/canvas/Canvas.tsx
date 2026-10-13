@@ -1,27 +1,28 @@
+import './canvas-ruler.css';
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useEditor } from '@/lib/editor';
+import { useEditorInteraction } from '@/components/editor/EditorInteractionProvider';
 import {
-  HorizontalRuler,
-  VerticalRuler,
-  RulerCorner,
-  RULER_OFFSET,
-} from './Ruler';
+  CanvasRuler,
+  CanvasRulerCorner,
+  DEFAULT_RULER_THICKNESS as RULER_OFFSET,
+} from '@dt-ai-design/canvas-ruler';
+import type {
+  HitResult,
+  InteractionCommand,
+} from '@dt-ai-design/editor-interaction';
+import { CanvasDocumentRenderer } from './CanvasDocumentRenderer';
+import { CanvasCreationOverlay } from './CanvasCreationOverlay';
+import { ViewportSelectionOverlay } from './ViewportSelectionOverlay';
 import type {
   Layer,
   FrameLayer,
-  RectangleLayer,
-  EllipseLayer,
-  TextLayer,
   GroupLayer,
-  StickyNoteLayer,
-  LayerTypeString,
-  EffectStyle,
-  StrokeStyle,
-  DesignDocument,
+  TextLayer,
 } from '@dt-ai-design/design-schema';
-import { createLayer } from '@dt-ai-design/design-schema';
-type LayerWithEffects = Layer & { effects?: EffectStyle[] };
-// --- Rendering Helpers ---
+
+// ─── Shared Helpers ───
+
 function getLayerTransform(layer: Layer): string {
   const cx = layer.x + layer.width / 2;
   const cy = layer.y + layer.height / 2;
@@ -29,25 +30,7 @@ function getLayerTransform(layer: Layer): string {
   if (rotation === 0) return '';
   return `rotate(${rotation} ${cx} ${cy})`;
 }
-function getStrokeDasharray(
-  stroke: StrokeStyle | undefined,
-): string | undefined {
-  if (!stroke || !stroke.style || stroke.style === 'solid') return undefined;
-  if (stroke.style === 'dashed')
-    return `${stroke.width * 3} ${stroke.width * 2}`;
-  if (stroke.style === 'dotted') return `${stroke.width} ${stroke.width * 1.5}`;
-  return undefined;
-}
-function getShadowFilterId(layerId: string): string {
-  return `shadow-${layerId}`;
-}
-function getFilterUrl(layer: Layer): string {
-  const effects = (layer as LayerWithEffects).effects;
-  if (!effects || effects.length === 0) return '';
-  const hasShadow = effects.some((e) => e.type === 'dropShadow');
-  if (hasShadow) return `url(#${getShadowFilterId(layer.id)})`;
-  return '';
-}
+
 function textAlignToAnchor(
   align: string | undefined,
 ): 'start' | 'middle' | 'end' {
@@ -60,38 +43,18 @@ function textAlignToAnchor(
       return 'start';
   }
 }
-function LayerFilters({ layer }: { layer: Layer }) {
-  const effects = (layer as LayerWithEffects).effects;
-  if (!effects || effects.length === 0) return null;
-  const shadows = effects.filter((e) => e.type === 'dropShadow');
-  if (shadows.length === 0) return null;
-  return (
-    <filter
-      id={getShadowFilterId(layer.id)}
-      x="-50%"
-      y="-50%"
-      width="200%"
-      height="200%"
-    >
-      {shadows.map((shadow, i: number) => (
-        <feDropShadow
-          key={i}
-          dx={shadow.x || 0}
-          dy={shadow.y || 0}
-          stdDeviation={(shadow.blur || 0) / 2}
-          floodColor={shadow.color || '#000000'}
-          floodOpacity={shadow.opacity ?? 0.25}
-        />
-      ))}
-    </filter>
-  );
-}
-// --- Main Canvas Component ---
+
+// ─── Main Canvas Component ───
+
 export function Canvas() {
   const editor = useEditor();
+  const { state: interactionState, dispatch: interactionDispatch } =
+    useEditorInteraction();
+
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [, forceUpdate] = useState(0);
+
   useMemo(
     () => editor.subscribe('change', () => forceUpdate((t) => t + 1)),
     [editor],
@@ -104,57 +67,33 @@ export function Canvas() {
     () => editor.subscribe('viewportChange', () => forceUpdate((t) => t + 1)),
     [editor],
   );
-  useMemo(
-    () => editor.subscribe('toolChange', () => forceUpdate((t) => t + 1)),
-    [editor],
-  );
+
   const doc = editor.getDocument();
   const viewport = editor.getViewport();
   const selection = editor.getSelection();
-  const activeTool = editor.getActiveTool();
-  const showRulers = editor.getShowRulers();
-  const dragStateRef = useRef({
-    isDragging: false,
-    startX: 0,
-    startY: 0,
-    initialPositions: new Map<string, { x: number; y: number }>(),
-    moved: false,
-  });
-  const panStateRef = useRef({
-    isPanning: false,
-    startX: 0,
-    startY: 0,
-    startPanX: 0,
-    startPanY: 0,
-  });
-  const marqueeRef = useRef({
-    active: false,
-    startX: 0,
-    startY: 0,
-    endX: 0,
-    endY: 0,
-    initialSelection: [] as string[],
-  });
-  const resizeRef = useRef({
-    active: false,
-    handle: '',
-    layerId: '',
-    startX: 0,
-    startY: 0,
-    startBounds: { x: 0, y: 0, width: 0, height: 0 },
-  });
-  const drawRef = useRef({
-    active: false,
-    startX: 0,
-    startY: 0,
-    endX: 0,
-    endY: 0,
-    layerId: null as string | null,
-  });
+  const [showRulers, setShowRulers] = useState(editor.getShowRulers());
+  useEffect(() => {
+    const handler = () => setShowRulers(editor.getShowRulers());
+    try {
+      const off = (
+        editor as unknown as {
+          subscribe: (evt: string, cb: () => void) => () => void;
+        }
+      ).subscribe('rulerToggle', handler);
+      return off;
+    } catch {
+      return () => {};
+    }
+  }, [editor]);
+
+  const activeTool = interactionState.activeTool;
+  const interactionMode = interactionState.mode;
+  const creationBounds = interactionState.creationBounds;
+  const marqueeBounds = interactionState.marqueeBounds;
+
   const hoveredLayerRef = useRef<string | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const spacePressedRef = useRef(false);
   const [mouseCanvasPos, setMouseCanvasPos] = useState<{
     x: number;
     y: number;
@@ -163,6 +102,11 @@ export function Canvas() {
   const [smartGuides, setSmartGuides] = useState<
     Array<{ type: 'v' | 'h'; pos: number; start: number; end: number }>
   >([]);
+
+  const initialDragPositionsRef = useRef<Map<string, { x: number; y: number }>>(
+    new Map(),
+  );
+  const marqueeInitialRef = useRef<string[]>([]);
   useEffect(() => {
     if (!containerRef.current) return;
     const updateSize = () => {
@@ -178,7 +122,11 @@ export function Canvas() {
     ro.observe(containerRef.current);
     return () => ro.disconnect();
   }, []);
+
   const canvasOffset = showRulers ? RULER_OFFSET : 0;
+  const rulerWidth = Math.max(0, containerSize.width - RULER_OFFSET);
+  const rulerHeight = Math.max(0, containerSize.height - RULER_OFFSET);
+
   const screenToCanvas = useCallback(
     (clientX: number, clientY: number) => {
       if (!svgRef.current) return { x: 0, y: 0 };
@@ -190,123 +138,318 @@ export function Canvas() {
     },
     [viewport],
   );
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      )
-        return;
-      const meta = e.metaKey || e.ctrlKey;
-      if (meta) return;
-      if (e.code === 'Space' && !e.repeat) {
-        spacePressedRef.current = true;
-        forceUpdate((t) => t + 1);
-        return;
-      }
-    };
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        spacePressedRef.current = false;
-        forceUpdate((t) => t + 1);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [editor]);
+
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       e.preventDefault();
-      if (!svgRef.current) return;
-      const rect = svgRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      const newZoom = Math.min(Math.max(viewport.zoom * (1 + delta), 0.1), 16);
-      const zoomRatio = newZoom / viewport.zoom;
-      const newPanX = mouseX - (mouseX - viewport.panX) * zoomRatio;
-      const newPanY = mouseY - (mouseY - viewport.panY) * zoomRatio;
-      editor.setViewport({ zoom: newZoom, panX: newPanX, panY: newPanY });
+      if (e.ctrlKey || e.metaKey) {
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        const newZoom = Math.min(
+          Math.max(viewport.zoom * (1 + delta), 0.1),
+          16,
+        );
+        const zoomRatio = newZoom / viewport.zoom;
+        const rect = svgRef.current?.getBoundingClientRect();
+        if (rect) {
+          const mouseX = e.clientX - rect.left;
+          const mouseY = e.clientY - rect.top;
+          const newPanX = mouseX - (mouseX - viewport.panX) * zoomRatio;
+          const newPanY = mouseY - (mouseY - viewport.panY) * zoomRatio;
+          editor.setViewport({
+            zoom: newZoom,
+            panX: newPanX,
+            panY: newPanY,
+          });
+        }
+      } else {
+        editor.pan(-e.deltaX, -e.deltaY);
+      }
     },
     [editor, viewport],
   );
+
   const computeSmartGuides = useCallback(
-    (movingLayerId: string, newX: number, newY: number) => {
+    (
+      movingId: string,
+      newX: number,
+      newY: number,
+    ): Array<{ type: 'v' | 'h'; pos: number; start: number; end: number }> => {
       const guides: Array<{
         type: 'v' | 'h';
         pos: number;
         start: number;
         end: number;
       }> = [];
-      const threshold = 5 / viewport.zoom;
-      const movingLayer = doc.layers[movingLayerId];
+      const movingLayer = doc.layers[movingId];
       if (!movingLayer) return guides;
-      const newW = movingLayer.width;
-      const newH = movingLayer.height;
-      const movingEdges = {
-        left: newX,
-        right: newX + newW,
-        centerX: newX + newW / 2,
-        top: newY,
-        bottom: newY + newH,
-        centerY: newY + newH / 2,
-      };
-      function checkLayer(id: string) {
-        if (id === movingLayerId) return;
-        const layer = doc.layers[id];
-        if (!layer || !layer.visible) return;
-        const fixedEdges = {
-          left: layer.x,
-          right: layer.x + layer.width,
-          centerX: layer.x + layer.width / 2,
-          top: layer.y,
-          bottom: layer.y + layer.height,
-          centerY: layer.y + layer.height / 2,
-        };
-        for (const mk of ['left', 'right', 'centerX'] as const) {
-          for (const fk of ['left', 'right', 'centerX'] as const) {
-            if (Math.abs(movingEdges[mk] - fixedEdges[fk]) < threshold) {
-              guides.push({
-                type: 'v',
-                pos: fixedEdges[fk],
-                start: Math.min(fixedEdges.top, movingEdges.top),
-                end: Math.max(fixedEdges.bottom, movingEdges.bottom),
-              });
-            }
-          }
+      const threshold = 4 / viewport.zoom;
+      const movingCX = newX + movingLayer.width / 2;
+      const movingCY = newY + movingLayer.height / 2;
+      const movingRight = newX + movingLayer.width;
+      const movingBottom = newY + movingLayer.height;
+
+      function checkLayer(layer: Layer): void {
+        if (layer.id === movingId || !layer.visible || layer.locked) return;
+        const otherCX = layer.x + layer.width / 2;
+        const otherCY = layer.y + layer.height / 2;
+        const otherRight = layer.x + layer.width;
+        const otherBottom = layer.y + layer.height;
+        const guideEnd = Math.max(layer.y + layer.height, movingBottom);
+        const guideStart = Math.min(layer.y, newY);
+        const guideEndH = Math.max(layer.x + layer.width, movingRight);
+        const guideStartH = Math.min(layer.x, newX);
+        if (Math.abs(newX - layer.x) < threshold) {
+          guides.push({
+            type: 'v',
+            pos: layer.x,
+            start: guideStart,
+            end: guideEnd,
+          });
         }
-        for (const mk of ['top', 'bottom', 'centerY'] as const) {
-          for (const fk of ['top', 'bottom', 'centerY'] as const) {
-            if (Math.abs(movingEdges[mk] - fixedEdges[fk]) < threshold) {
-              guides.push({
-                type: 'h',
-                pos: fixedEdges[fk],
-                start: Math.min(fixedEdges.left, movingEdges.left),
-                end: Math.max(fixedEdges.right, movingEdges.right),
-              });
-            }
-          }
+        if (Math.abs(movingRight - otherRight) < threshold) {
+          guides.push({
+            type: 'v',
+            pos: otherRight,
+            start: guideStart,
+            end: guideEnd,
+          });
         }
-        if (layer.type === 'frame' || layer.type === 'group') {
-          const children = (layer as FrameLayer | GroupLayer).children;
-          if (children) children.forEach(checkLayer);
+        if (Math.abs(movingCX - otherCX) < threshold) {
+          guides.push({
+            type: 'v',
+            pos: otherCX,
+            start: guideStart,
+            end: guideEnd,
+          });
+        }
+        if (Math.abs(newY - layer.y) < threshold) {
+          guides.push({
+            type: 'h',
+            pos: layer.y,
+            start: guideStartH,
+            end: guideEndH,
+          });
+        }
+        if (Math.abs(movingBottom - otherBottom) < threshold) {
+          guides.push({
+            type: 'h',
+            pos: otherBottom,
+            start: guideStartH,
+            end: guideEndH,
+          });
+        }
+        if (Math.abs(movingCY - otherCY) < threshold) {
+          guides.push({
+            type: 'h',
+            pos: otherCY,
+            start: guideStartH,
+            end: guideEndH,
+          });
         }
       }
-      doc.rootLayerIds.forEach(checkLayer);
+      function checkChildren(ids: string[]): void {
+        for (const id of ids) {
+          const layer = doc.layers[id];
+          if (!layer) continue;
+          checkLayer(layer);
+          if (layer.type === 'frame' || layer.type === 'group') {
+            const children = (layer as FrameLayer | GroupLayer).children;
+            if (children) checkChildren(children);
+          }
+        }
+      }
+      checkChildren(doc.rootLayerIds);
       return guides;
     },
     [doc, viewport.zoom],
   );
+  // ─── Hit test ───
+  const hitTestAtPoint = useCallback(
+    (canvasX: number, canvasY: number): HitResult => {
+      function hitLayer(layer: Layer): boolean {
+        if (!layer.visible || layer.locked) return false;
+        const transform = getLayerTransform(layer);
+        if (transform) {
+          const cx = layer.x + layer.width / 2;
+          const cy = layer.y + layer.height / 2;
+          const dx = canvasX - cx;
+          const dy = canvasY - cy;
+          const cos = Math.cos(0);
+          const sin = Math.sin(0);
+          const localX = dx * cos + dy * sin + cx;
+          const localY = -dx * sin + dy * cos + cy;
+          return (
+            localX >= layer.x &&
+            localX <= layer.x + layer.width &&
+            localY >= layer.y &&
+            localY <= layer.y + layer.height
+          );
+        }
+        return (
+          canvasX >= layer.x &&
+          canvasX <= layer.x + layer.width &&
+          canvasY >= layer.y &&
+          canvasY <= layer.y + layer.height
+        );
+      }
+
+      function hitTestChildren(ids: string[]): string | null {
+        for (let i = ids.length - 1; i >= 0; i--) {
+          const id = ids[i];
+          const layer = doc.layers[id];
+          if (!layer) continue;
+          if (layer.type === 'frame' || layer.type === 'group') {
+            const children = (layer as FrameLayer | GroupLayer).children;
+            if (children) {
+              const childHit = hitTestChildren(children);
+              if (childHit) return childHit;
+            }
+          }
+          if (hitLayer(layer)) return layer.id;
+        }
+        return null;
+      }
+
+      const hitId = hitTestChildren(doc.rootLayerIds);
+      if (hitId) {
+        return { layerId: hitId, type: 'layer' };
+      }
+      return { layerId: '', type: 'empty' };
+    },
+    [doc],
+  );
+
+  // ─── Command execution: bridge interaction commands to editor-core ───
+  const executeCommands = useCallback(
+    (commands: InteractionCommand[]) => {
+      for (const cmd of commands) {
+        switch (cmd.type) {
+          case 'setActiveTool':
+            editor.setActiveTool(cmd.tool);
+            break;
+          case 'selectLayer':
+            editor.setSelection(cmd.layerIds);
+            break;
+          case 'deselectAll':
+            editor.deselectAll();
+            break;
+          case 'startPan':
+          case 'endPan':
+            break;
+          case 'pan':
+            editor.pan(cmd.dx * viewport.zoom, cmd.dy * viewport.zoom);
+            break;
+          case 'createLayer': {
+            const w = Math.max(cmd.bounds.width, 1);
+            const h = Math.max(cmd.bounds.height, 1);
+            editor.addLayer(cmd.layerType, {
+              x: cmd.bounds.x,
+              y: cmd.bounds.y,
+              width: w,
+              height: h,
+            });
+            break;
+          }
+          case 'moveLayer': {
+            for (const id of cmd.layerIds) {
+              const layer = doc.layers[id];
+              if (layer) {
+                const newX = layer.x + cmd.dx;
+                const newY = layer.y + cmd.dy;
+                editor.moveLayer(id, newX, newY);
+                if (cmd.layerIds.length === 1) {
+                  const guides = computeSmartGuides(id, newX, newY);
+                  setSmartGuides(guides);
+                }
+              }
+            }
+            break;
+          }
+          case 'resizeLayer': {
+            const layer = doc.layers[cmd.layerId];
+            if (!layer) break;
+            const handle = cmd.handle;
+            let newX = layer.x;
+            let newY = layer.y;
+            let newW = layer.width;
+            let newH = layer.height;
+            const dx = cmd.dx;
+            const dy = cmd.dy;
+            if (handle.includes('r')) {
+              newW = Math.max(1, layer.width + dx);
+            }
+            if (handle.includes('l')) {
+              newW = Math.max(1, layer.width - dx);
+              newX = layer.x + layer.width - newW;
+            }
+            if (handle.includes('b')) {
+              newH = Math.max(1, layer.height + dy);
+            }
+            if (handle.includes('t')) {
+              newH = Math.max(1, layer.height - dy);
+              newY = layer.y + layer.height - newH;
+            }
+            editor.moveLayer(cmd.layerId, newX, newY);
+            editor.resizeLayer(cmd.layerId, newW, newH);
+            break;
+          }
+          case 'updateMarquee': {
+            const intersecting: string[] = [];
+            const { x, y, width, height } = cmd.bounds;
+            const right = x + width;
+            const bottom = y + height;
+            function checkLayers(ids: string[]): void {
+              for (const id of ids) {
+                const layer = doc.layers[id];
+                if (!layer || !layer.visible || layer.locked) continue;
+                const layerRight = layer.x + layer.width;
+                const layerBottom = layer.y + layer.height;
+                if (
+                  layer.x < right &&
+                  layerRight > x &&
+                  layer.y < bottom &&
+                  layerBottom > y
+                ) {
+                  intersecting.push(id);
+                }
+                if (layer.type === 'frame' || layer.type === 'group') {
+                  const children = (layer as FrameLayer | GroupLayer).children;
+                  if (children) checkLayers(children);
+                }
+              }
+            }
+            checkLayers(doc.rootLayerIds);
+            if (cmd.additive && marqueeInitialRef.current.length > 0) {
+              const combined = new Set([
+                ...marqueeInitialRef.current,
+                ...intersecting,
+              ]);
+              editor.setSelection([...combined]);
+            } else {
+              editor.setSelection(intersecting);
+            }
+            break;
+          }
+          case 'endMarquee':
+            marqueeInitialRef.current = [];
+            break;
+          case 'showCreationOverlay':
+          case 'updateCreationOverlay':
+          case 'clearCreationOverlay':
+            break;
+          default:
+            break;
+        }
+      }
+    },
+    [editor, doc, viewport.zoom, computeSmartGuides],
+  );
+  // ─── Pointer event handlers (delegated to interaction state machine) ───
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       const canvasPos = screenToCanvas(e.clientX, e.clientY);
       setMouseCanvasPos(canvasPos);
+
       if (activeTool === 'zoom' && e.button === 0) {
         const delta = e.altKey || e.shiftKey ? -0.1 : 0.1;
         const newZoom = Math.min(
@@ -320,229 +463,147 @@ export function Canvas() {
           const mouseY = e.clientY - rect.top;
           const newPanX = mouseX - (mouseX - viewport.panX) * zoomRatio;
           const newPanY = mouseY - (mouseY - viewport.panY) * zoomRatio;
-          editor.setViewport({ zoom: newZoom, panX: newPanX, panY: newPanY });
+          editor.setViewport({
+            zoom: newZoom,
+            panX: newPanX,
+            panY: newPanY,
+          });
         }
         return;
       }
-      if (
-        e.button === 1 ||
-        (e.button === 0 && spacePressedRef.current) ||
-        activeTool === 'hand'
-      ) {
-        panStateRef.current = {
-          isPanning: true,
-          startX: e.clientX,
-          startY: e.clientY,
-          startPanX: viewport.panX,
-          startPanY: viewport.panY,
-        };
-        return;
-      }
-      if (e.button !== 0) return;
-      if (['rectangle', 'ellipse', 'frame', 'text'].includes(activeTool)) {
-        const toolType = activeTool as LayerTypeString;
-        const newLayer = createLayer(toolType as 'rectangle', {
-          x: canvasPos.x,
-          y: canvasPos.y,
-          width: 1,
-          height: 1,
+
+      // Middle-click always pans
+      if (e.button === 1) {
+        const emptyHit: HitResult = { layerId: '', type: 'empty' };
+        const commands = interactionDispatch({
+          type: 'pointerDown',
+          point: { x: e.clientX, y: e.clientY },
+          hit: emptyHit,
+          shiftKey: e.shiftKey,
+          metaKey: e.metaKey || e.ctrlKey,
         });
-        editor.addLayer(toolType, newLayer);
-        drawRef.current = {
-          active: true,
-          startX: canvasPos.x,
-          startY: canvasPos.y,
-          endX: canvasPos.x,
-          endY: canvasPos.y,
-          layerId: newLayer.id,
-        };
-        return;
-      }
-      if (activeTool === 'select' && e.target === svgRef.current) {
-        marqueeRef.current = {
-          active: true,
-          startX: canvasPos.x,
-          startY: canvasPos.y,
-          endX: canvasPos.x,
-          endY: canvasPos.y,
-          initialSelection: e.shiftKey ? [...selection.layerIds] : [],
-        };
-        if (!e.shiftKey) {
-          editor.deselectAll();
+        // Pan with screen coordinates
+        for (const cmd of commands) {
+          if (cmd.type === 'pan') {
+            editor.pan(cmd.dx, cmd.dy);
+          }
         }
         return;
       }
+
+      if (e.button !== 0) return;
+
+      const hit = hitTestAtPoint(canvasPos.x, canvasPos.y);
+
+      // Save initial positions for move/smart guides
+      if (activeTool === 'select' && hit.type === 'layer' && !e.shiftKey) {
+        const alreadySelected = selection.layerIds.includes(hit.layerId);
+        const selIds = alreadySelected ? selection.layerIds : [hit.layerId];
+        initialDragPositionsRef.current = new Map();
+        for (const id of selIds) {
+          const l = doc.layers[id];
+          if (l) initialDragPositionsRef.current.set(id, { x: l.x, y: l.y });
+        }
+      } else if (activeTool === 'select' && hit.type === 'empty') {
+        marqueeInitialRef.current = e.shiftKey ? [...selection.layerIds] : [];
+      }
+
+      const commands = interactionDispatch({
+        type: 'pointerDown',
+        point: canvasPos,
+        hit,
+        shiftKey: e.shiftKey,
+        metaKey: e.metaKey || e.ctrlKey,
+      });
+
+      executeCommands(commands);
     },
-    [editor, viewport, activeTool, selection.layerIds, screenToCanvas],
+    [
+      editor,
+      viewport,
+      activeTool,
+      selection.layerIds,
+      screenToCanvas,
+      hitTestAtPoint,
+      doc,
+      interactionDispatch,
+      executeCommands,
+    ],
   );
+
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
       const canvasPos = screenToCanvas(e.clientX, e.clientY);
       setMouseCanvasPos(canvasPos);
-      if (panStateRef.current.isPanning) {
-        const dx = e.clientX - panStateRef.current.startX;
-        const dy = e.clientY - panStateRef.current.startY;
-        editor.setViewport({
-          panX: panStateRef.current.startPanX + dx,
-          panY: panStateRef.current.startPanY + dy,
-        });
-        return;
-      }
-      if (marqueeRef.current.active) {
-        marqueeRef.current.endX = canvasPos.x;
-        marqueeRef.current.endY = canvasPos.y;
-        const mx = Math.min(marqueeRef.current.startX, marqueeRef.current.endX);
-        const my = Math.min(marqueeRef.current.startY, marqueeRef.current.endY);
-        const mw = Math.abs(
-          marqueeRef.current.endX - marqueeRef.current.startX,
-        );
-        const mh = Math.abs(
-          marqueeRef.current.endY - marqueeRef.current.startY,
-        );
-        const intersecting: string[] = [];
-        const initial = marqueeRef.current.initialSelection;
-        function checkLayers(ids: string[]): void {
-          for (const id of ids) {
-            const layer = doc.layers[id];
-            if (!layer || !layer.visible || layer.locked) continue;
-            const layerRight = layer.x + layer.width;
-            const layerBottom = layer.y + layer.height;
-            const marqueeRight = mx + mw;
-            const marqueeBottom = my + mh;
-            if (
-              layer.x < marqueeRight &&
-              layerRight > mx &&
-              layer.y < marqueeBottom &&
-              layerBottom > my
-            ) {
-              intersecting.push(id);
-            }
-            if (layer.type === 'frame' || layer.type === 'group') {
-              const children = (layer as FrameLayer | GroupLayer).children;
-              if (children) checkLayers(children);
-            }
-          }
-        }
-        checkLayers(doc.rootLayerIds);
-        if (initial.length > 0) {
-          const combined = new Set([...initial, ...intersecting]);
-          editor.setSelection([...combined]);
+
+      if (interactionMode === 'idle') return;
+
+      const commands = interactionDispatch({
+        type: 'pointerMove',
+        point:
+          interactionMode === 'panning'
+            ? { x: e.clientX, y: e.clientY }
+            : canvasPos,
+        buttons: e.buttons,
+        shiftKey: e.shiftKey,
+      });
+
+      for (const cmd of commands) {
+        if (cmd.type === 'pan' && interactionMode === 'panning') {
+          editor.pan(cmd.dx, cmd.dy);
         } else {
-          editor.setSelection(intersecting);
-        }
-        forceUpdate((t) => t + 1);
-        return;
-      }
-      if (resizeRef.current.active) {
-        const { handle, startBounds, layerId } = resizeRef.current;
-        let newX = startBounds.x;
-        let newY = startBounds.y;
-        let newW = startBounds.width;
-        let newH = startBounds.height;
-        const dx = canvasPos.x - resizeRef.current.startX;
-        const dy = canvasPos.y - resizeRef.current.startY;
-        if (handle.includes('r')) {
-          newW = Math.max(1, startBounds.width + dx);
-        }
-        if (handle.includes('l')) {
-          newW = Math.max(1, startBounds.width - dx);
-          newX = startBounds.x + startBounds.width - newW;
-        }
-        if (handle.includes('b')) {
-          newH = Math.max(1, startBounds.height + dy);
-        }
-        if (handle.includes('t')) {
-          newH = Math.max(1, startBounds.height - dy);
-          newY = startBounds.y + startBounds.height - newH;
-        }
-        if (e.shiftKey && ['tl', 'tr', 'bl', 'br'].includes(handle)) {
-          const ratio = startBounds.width / startBounds.height;
-          if (Math.abs(newW / newH - ratio) > 0.01) {
-            if (Math.abs(dx) > Math.abs(dy)) {
-              newH = newW / ratio;
-              if (handle.includes('t')) {
-                newY = startBounds.y + startBounds.height - newH;
-              }
-            } else {
-              newW = newH * ratio;
-              if (handle.includes('l')) {
-                newX = startBounds.x + startBounds.width - newW;
-              }
-            }
-          }
-        }
-        editor.moveLayer(layerId, newX, newY);
-        editor.resizeLayer(layerId, newW, newH);
-        return;
-      }
-      if (drawRef.current.active && drawRef.current.layerId) {
-        drawRef.current.endX = canvasPos.x;
-        drawRef.current.endY = canvasPos.y;
-        const x = Math.min(drawRef.current.startX, drawRef.current.endX);
-        const y = Math.min(drawRef.current.startY, drawRef.current.endY);
-        const w = Math.max(
-          1,
-          Math.abs(drawRef.current.endX - drawRef.current.startX),
-        );
-        const h = Math.max(
-          1,
-          Math.abs(drawRef.current.endY - drawRef.current.startY),
-        );
-        const layerId = drawRef.current.layerId;
-        editor.moveLayer(layerId, x, y);
-        editor.resizeLayer(layerId, w, h);
-        forceUpdate((t) => t + 1);
-        return;
-      }
-      if (dragStateRef.current.isDragging) {
-        const startCanvasPos = screenToCanvas(
-          dragStateRef.current.startX,
-          dragStateRef.current.startY,
-        );
-        const dx = canvasPos.x - startCanvasPos.x;
-        const dy = canvasPos.y - startCanvasPos.y;
-        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-          dragStateRef.current.moved = true;
-        }
-        if (dragStateRef.current.initialPositions.size === 1) {
-          const [firstId, firstPos] = Array.from(
-            dragStateRef.current.initialPositions,
-          )[0];
-          const guides = computeSmartGuides(
-            firstId,
-            firstPos.x + dx,
-            firstPos.y + dy,
-          );
-          setSmartGuides(guides);
-        }
-        for (const [layerId, pos] of dragStateRef.current.initialPositions) {
-          editor.moveLayer(layerId, pos.x + dx, pos.y + dy);
+          executeCommands([cmd]);
         }
       }
     },
-    [editor, screenToCanvas, doc, activeTool, computeSmartGuides],
+    [
+      interactionMode,
+      screenToCanvas,
+      interactionDispatch,
+      editor,
+      executeCommands,
+    ],
   );
-  const handleMouseUp = useCallback(() => {
-    panStateRef.current.isPanning = false;
-    dragStateRef.current.isDragging = false;
-    marqueeRef.current.active = false;
-    resizeRef.current.active = false;
-    setSmartGuides([]);
-    if (drawRef.current.active) {
-      drawRef.current.active = false;
-      if (drawRef.current.layerId) {
-        editor.setActiveTool('select');
-      }
-    }
-  }, [editor]);
+
+  const handleMouseUp = useCallback(
+    (e: React.MouseEvent) => {
+      if (interactionMode === 'idle') return;
+
+      const canvasPos = screenToCanvas(e.clientX, e.clientY);
+      const hit = hitTestAtPoint(canvasPos.x, canvasPos.y);
+
+      const commands = interactionDispatch({
+        type: 'pointerUp',
+        point:
+          interactionMode === 'panning'
+            ? { x: e.clientX, y: e.clientY }
+            : canvasPos,
+        hit,
+      });
+
+      executeCommands(commands);
+      setSmartGuides([]);
+      initialDragPositionsRef.current = new Map();
+    },
+    [
+      interactionMode,
+      screenToCanvas,
+      hitTestAtPoint,
+      interactionDispatch,
+      executeCommands,
+    ],
+  );
+
   const handleLayerEnter = useCallback((layerId: string) => {
     hoveredLayerRef.current = layerId;
     forceUpdate((t) => t + 1);
   }, []);
+
   const handleLayerLeave = useCallback(() => {
     hoveredLayerRef.current = null;
     forceUpdate((t) => t + 1);
   }, []);
+
   const handleResizeStart = useCallback(
     (e: React.MouseEvent, handle: string, layerId: string) => {
       e.stopPropagation();
@@ -550,58 +611,17 @@ export function Canvas() {
       const layer = doc.layers[layerId];
       if (!layer) return;
       const canvasPos = screenToCanvas(e.clientX, e.clientY);
-      resizeRef.current = {
-        active: true,
-        handle,
-        layerId,
-        startX: canvasPos.x,
-        startY: canvasPos.y,
-        startBounds: {
-          x: layer.x,
-          y: layer.y,
-          width: layer.width,
-          height: layer.height,
-        },
-      };
+      interactionDispatch({
+        type: 'pointerDown',
+        point: canvasPos,
+        hit: { layerId, type: 'handle', handleId: handle },
+        shiftKey: e.shiftKey,
+        metaKey: e.metaKey || e.ctrlKey,
+      });
     },
-    [activeTool, doc, screenToCanvas],
+    [activeTool, doc, screenToCanvas, interactionDispatch],
   );
-  const handleLayerClick = useCallback(
-    (e: React.MouseEvent, layerId: string) => {
-      e.stopPropagation();
-      if (panStateRef.current.isPanning) return;
-      if (activeTool !== 'select') return;
-      const layer = doc.layers[layerId];
-      if (!layer || layer.locked) return;
-      if (e.shiftKey) {
-        const current = selection.layerIds;
-        if (current.includes(layerId)) {
-          editor.setSelection(current.filter((id) => id !== layerId));
-        } else {
-          editor.setSelection([...current, layerId]);
-        }
-      } else if (!selection.layerIds.includes(layerId)) {
-        editor.setSelection([layerId]);
-      }
-      dragStateRef.current = {
-        isDragging: true,
-        startX: e.clientX,
-        startY: e.clientY,
-        initialPositions: new Map(),
-        moved: false,
-      };
-      const sel = selection.layerIds.includes(layerId)
-        ? selection.layerIds
-        : [layerId];
-      for (const id of sel) {
-        const l = doc.layers[id];
-        if (l) {
-          dragStateRef.current.initialPositions.set(id, { x: l.x, y: l.y });
-        }
-      }
-    },
-    [doc, selection, editor, activeTool],
-  );
+
   const handleTextDoubleClick = useCallback(
     (e: React.MouseEvent, layerId: string) => {
       e.stopPropagation();
@@ -614,6 +634,7 @@ export function Canvas() {
     },
     [doc, selection, editor],
   );
+
   const finishTextEditing = useCallback(
     (cancel = false) => {
       if (!editingTextId) return;
@@ -625,21 +646,63 @@ export function Canvas() {
     },
     [editingTextId, editor],
   );
+
   useEffect(() => {
     if (editingTextId && textareaRef.current) {
       textareaRef.current.focus();
       textareaRef.current.select();
     }
   }, [editingTextId]);
-  const topLevelLayers = useMemo(() => {
-    return doc.rootLayerIds.map((id) => doc.layers[id]).filter(Boolean);
-  }, [doc]);
+
+  // Keyboard: space bar for panning
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === ' ' && !e.repeat) {
+        const target = e.target as HTMLElement;
+        if (
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+        e.preventDefault();
+        interactionDispatch({
+          type: 'keyDown',
+          key: ' ',
+          metaKey: false,
+          shiftKey: false,
+        });
+      } else if (e.key === 'Escape') {
+        interactionDispatch({ type: 'escape' });
+        setEditingTextId(null);
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === ' ') {
+        interactionDispatch({
+          type: 'keyUp',
+          key: ' ',
+          metaKey: false,
+          shiftKey: false,
+        });
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [interactionDispatch]);
+
   const hoveredId = hoveredLayerRef.current;
+
   const getCanvasCursor = () => {
-    if (panStateRef.current.isPanning) return 'grabbing';
-    if (activeTool === 'hand' || spacePressedRef.current) return 'grab';
+    if (interactionMode === 'panning') return 'grabbing';
+    if (activeTool === 'hand' || interactionState.isSpacePressed) return 'grab';
     if (activeTool === 'zoom') return 'zoom-in';
-    if (['rectangle', 'ellipse', 'frame', 'text'].includes(activeTool))
+    if (['rectangle', 'ellipse', 'frame', 'triangle'].includes(activeTool))
       return 'crosshair';
     return 'default';
   };
@@ -657,17 +720,26 @@ export function Canvas() {
             className="absolute left-0 top-0 z-10"
             style={{ width: RULER_OFFSET, height: RULER_OFFSET }}
           >
-            <RulerCorner />
+            <CanvasRulerCorner thickness={RULER_OFFSET} />
           </div>
           <div
             className="absolute left-0 z-10"
             style={{ top: RULER_OFFSET, left: 0, width: RULER_OFFSET }}
           >
-            <VerticalRuler
-              viewport={viewport}
-              containerWidth={containerSize.width - RULER_OFFSET}
-              containerHeight={containerSize.height - RULER_OFFSET}
-              mousePos={mouseCanvasPos}
+            <CanvasRuler
+              axis="vertical"
+              zoom={viewport.zoom}
+              viewportSize={rulerHeight}
+              worldStart={-viewport.panY / viewport.zoom}
+              worldEnd={
+                rulerHeight / viewport.zoom - viewport.panY / viewport.zoom
+              }
+              thickness={RULER_OFFSET}
+              mousePos={
+                mouseCanvasPos
+                  ? mouseCanvasPos.y * viewport.zoom + viewport.panY
+                  : null
+              }
             />
           </div>
           <div
@@ -679,15 +751,25 @@ export function Canvas() {
               height: RULER_OFFSET,
             }}
           >
-            <HorizontalRuler
-              viewport={viewport}
-              containerWidth={containerSize.width - RULER_OFFSET}
-              containerHeight={containerSize.height - RULER_OFFSET}
-              mousePos={mouseCanvasPos}
+            <CanvasRuler
+              axis="horizontal"
+              zoom={viewport.zoom}
+              viewportSize={rulerWidth}
+              worldStart={-viewport.panX / viewport.zoom}
+              worldEnd={
+                rulerWidth / viewport.zoom - viewport.panX / viewport.zoom
+              }
+              thickness={RULER_OFFSET}
+              mousePos={
+                mouseCanvasPos
+                  ? mouseCanvasPos.x * viewport.zoom + viewport.panX
+                  : null
+              }
             />
           </div>
         </>
       )}
+
       {/* Grid background */}
       <div
         className="pointer-events-none absolute inset-0 opacity-30"
@@ -700,6 +782,7 @@ export function Canvas() {
           marginTop: canvasOffset,
         }}
       />
+
       <svg
         ref={svgRef}
         className="absolute h-full w-full"
@@ -712,25 +795,16 @@ export function Canvas() {
         <g
           transform={`translate(${viewport.panX}, ${viewport.panY}) scale(${viewport.zoom})`}
         >
-          {/* SVG filter definitions */}
-          <defs>
-            {topLevelLayers.map((layer) => (
-              <LayerFilters key={`f-${layer.id}`} layer={layer} />
-            ))}
-          </defs>
-          {topLevelLayers.map((layer) => (
-            <LayerNode
-              key={layer.id}
-              layer={layer}
-              doc={doc}
-              selected={selection.layerIds.includes(layer.id)}
-              hovered={hoveredId === layer.id}
-              onClick={(e) => handleLayerClick(e, layer.id)}
-              onDoubleClick={(e) => handleTextDoubleClick(e, layer.id)}
-              onMouseEnter={() => handleLayerEnter(layer.id)}
-              onMouseLeave={handleLayerLeave}
-            />
-          ))}
+          <CanvasDocumentRenderer
+            doc={doc}
+            selectedIds={selection.layerIds}
+            hoveredId={hoveredId}
+            onLayerClick={() => {}}
+            onLayerDoubleClick={handleTextDoubleClick}
+            onLayerEnter={handleLayerEnter}
+            onLayerLeave={handleLayerLeave}
+          />
+
           {/* Smart guides */}
           {smartGuides.map((guide, i) => (
             <line
@@ -744,53 +818,37 @@ export function Canvas() {
               style={{ pointerEvents: 'none' }}
             />
           ))}
-          {/* Selection handles */}
-          {selection.layerIds.map((id) => {
-            const layer = doc.layers[id];
-            if (!layer) return null;
-            return (
-              <SelectionHandles
-                key={id}
-                layer={layer}
-                onHandleDown={(e, handle) => handleResizeStart(e, handle, id)}
-                showHandles={
-                  activeTool === 'select' && selection.layerIds.length === 1
-                }
-                zoom={viewport.zoom}
-              />
-            );
-          })}
-          {/* Marquee selection */}
-          {marqueeRef.current.active &&
-            (() => {
-              const mx = Math.min(
-                marqueeRef.current.startX,
-                marqueeRef.current.endX,
-              );
-              const my = Math.min(
-                marqueeRef.current.startY,
-                marqueeRef.current.endY,
-              );
-              const mw = Math.abs(
-                marqueeRef.current.endX - marqueeRef.current.startX,
-              );
-              const mh = Math.abs(
-                marqueeRef.current.endY - marqueeRef.current.startY,
-              );
-              return (
-                <rect
-                  x={mx}
-                  y={my}
-                  width={mw}
-                  height={mh}
-                  fill="rgba(139, 92, 246, 0.1)"
-                  stroke="#8b5cf6"
-                  strokeWidth={1 / viewport.zoom}
-                  strokeDasharray={`${4 / viewport.zoom} ${2 / viewport.zoom}`}
-                  style={{ pointerEvents: 'none' }}
-                />
-              );
-            })()}
+
+          {/* Marquee selection rectangle */}
+          {interactionMode === 'marqueeSelecting' && marqueeBounds && (
+            <rect
+              x={marqueeBounds.x}
+              y={marqueeBounds.y}
+              width={marqueeBounds.width}
+              height={marqueeBounds.height}
+              fill="rgba(139, 92, 246, 0.1)"
+              stroke="#8b5cf6"
+              strokeWidth={1 / viewport.zoom}
+              strokeDasharray={`${4 / viewport.zoom} ${2 / viewport.zoom}`}
+              style={{ pointerEvents: 'none' }}
+            />
+          )}
+
+          {/* Creation preview (shape tools) */}
+          {interactionMode === 'creatingShape' && creationBounds && (
+            <rect
+              x={creationBounds.x}
+              y={creationBounds.y}
+              width={creationBounds.width}
+              height={creationBounds.height}
+              fill="rgba(139, 92, 246, 0.15)"
+              stroke="#8b5cf6"
+              strokeWidth={1 / viewport.zoom}
+              strokeDasharray={`${4 / viewport.zoom} ${2 / viewport.zoom}`}
+              style={{ pointerEvents: 'none' }}
+            />
+          )}
+
           {/* Hover highlight */}
           {hoveredId &&
             !selection.layerIds.includes(hoveredId) &&
@@ -814,6 +872,87 @@ export function Canvas() {
             })()}
         </g>
       </svg>
+
+      {/* Hover highlight (screen-space) */}
+      {hoveredId &&
+        !selection.layerIds.includes(hoveredId) &&
+        (() => {
+          const layer = doc.layers[hoveredId];
+          if (!layer || !layer.visible) return null;
+          const hx = layer.x * viewport.zoom + viewport.panX + canvasOffset;
+          const hy = layer.y * viewport.zoom + viewport.panY + canvasOffset;
+          const hw = layer.width * viewport.zoom;
+          const hh = layer.height * viewport.zoom;
+          const hasRot = (layer.rotation || 0) !== 0;
+          return (
+            <div
+              style={{
+                position: 'absolute',
+                left: `${hx}px`,
+                top: `${hy}px`,
+                width: `${hw}px`,
+                height: `${hh}px`,
+                border: '1px dashed #60a5fa',
+                boxSizing: 'border-box',
+                pointerEvents: 'none',
+                zIndex: 14,
+                transformOrigin: 'center center',
+                transform: hasRot ? `rotate(${layer.rotation}deg)` : undefined,
+              }}
+            />
+          );
+        })()}
+
+      {/* Marquee selection (screen-space) */}
+      {interactionMode === 'marqueeSelecting' && marqueeBounds && (
+        <div
+          style={{
+            position: 'absolute',
+            left: `${marqueeBounds.x * viewport.zoom + viewport.panX + canvasOffset}px`,
+            top: `${marqueeBounds.y * viewport.zoom + viewport.panY + canvasOffset}px`,
+            width: `${Math.max(marqueeBounds.width * viewport.zoom, 0)}px`,
+            height: `${Math.max(marqueeBounds.height * viewport.zoom, 0)}px`,
+            border: '1px dashed #8b5cf6',
+            background: 'rgba(139, 92, 246, 0.1)',
+            boxSizing: 'border-box',
+            pointerEvents: 'none',
+            zIndex: 16,
+          }}
+        />
+      )}
+
+      {/* Selection overlay (screen-space) */}
+      <ViewportSelectionOverlay
+        layers={
+          selection.layerIds
+            .map((id) => doc.layers[id])
+            .filter(Boolean) as Layer[]
+        }
+        panX={viewport.panX + canvasOffset}
+        panY={viewport.panY + canvasOffset}
+        zoom={viewport.zoom}
+        showHandles={
+          activeTool === 'select' &&
+          selection.layerIds.length === 1 &&
+          interactionMode === 'idle'
+        }
+        onHandleDown={(e, handle, layerId) => {
+          e.preventDefault();
+          handleResizeStart(e, handle, layerId);
+        }}
+      />
+
+      {/* Creation overlay (screen-space */}
+      {interactionMode === 'creatingShape' && creationBounds && (
+        <CanvasCreationOverlay
+          tool={activeTool}
+          bounds={creationBounds}
+          panX={viewport.panX + canvasOffset}
+          panY={viewport.panY + canvasOffset}
+          zoom={viewport.zoom}
+        />
+      )}
+
       {/* Text inline editor */}
       {editingTextId &&
         (() => {
@@ -886,545 +1025,5 @@ export function Canvas() {
           );
         })()}
     </div>
-  );
-}
-// --- Layer Node Components ---
-interface LayerNodeProps {
-  layer: Layer;
-  doc: DesignDocument;
-  selected: boolean;
-  hovered: boolean;
-  onClick: (e: React.MouseEvent) => void;
-  onDoubleClick?: (e: React.MouseEvent) => void;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
-}
-function LayerNode({
-  layer,
-  doc,
-  selected,
-  hovered,
-  onClick,
-  onDoubleClick,
-  onMouseEnter,
-  onMouseLeave,
-}: LayerNodeProps) {
-  if (!layer.visible) return null;
-  if (layer.type === 'frame') {
-    return (
-      <FrameLayerNode
-        layer={layer as FrameLayer}
-        doc={doc}
-        selected={selected}
-        hovered={hovered}
-        onClick={onClick}
-        onDoubleClick={onDoubleClick}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-      />
-    );
-  }
-  if (layer.type === 'group') {
-    return (
-      <GroupLayerNode
-        layer={layer as GroupLayer}
-        doc={doc}
-        selected={selected}
-        hovered={hovered}
-        onClick={onClick}
-        onDoubleClick={onDoubleClick}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-      />
-    );
-  }
-  if (layer.type === 'rectangle') {
-    return (
-      <RectangleLayerNode
-        layer={layer as RectangleLayer}
-        selected={selected}
-        hovered={hovered}
-        onClick={onClick}
-        onDoubleClick={onDoubleClick}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-      />
-    );
-  }
-  if (layer.type === 'ellipse') {
-    return (
-      <EllipseLayerNode
-        layer={layer as EllipseLayer}
-        selected={selected}
-        hovered={hovered}
-        onClick={onClick}
-        onDoubleClick={onDoubleClick}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-      />
-    );
-  }
-  if (layer.type === 'text') {
-    return (
-      <TextLayerNode
-        layer={layer as TextLayer}
-        selected={selected}
-        hovered={hovered}
-        onClick={onClick}
-        onDoubleClick={onDoubleClick}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-      />
-    );
-  }
-  if (layer.type === 'stickyNote') {
-    return (
-      <StickyNoteLayerNode
-        layer={layer as StickyNoteLayer}
-        selected={selected}
-        hovered={hovered}
-        onClick={onClick}
-        onDoubleClick={onDoubleClick}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-      />
-    );
-  }
-  return (
-    <rect
-      x={layer.x}
-      y={layer.y}
-      width={layer.width}
-      height={layer.height}
-      fill="#666"
-      opacity={layer.opacity}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      style={{ cursor: layer.locked ? 'not-allowed' : 'move' }}
-    />
-  );
-}
-function FrameLayerNode({
-  layer,
-  doc,
-  onClick,
-  onDoubleClick,
-  onMouseEnter,
-  onMouseLeave,
-}: {
-  layer: FrameLayer;
-  doc: DesignDocument;
-  selected: boolean;
-  hovered: boolean;
-  onClick: (e: React.MouseEvent) => void;
-  onDoubleClick?: (e: React.MouseEvent) => void;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
-}) {
-  const fill = layer.fills?.[0];
-  const stroke = layer.strokes?.[0];
-  const transform = getLayerTransform(layer);
-  const filter = getFilterUrl(layer);
-  const strokeDasharray = getStrokeDasharray(stroke);
-  return (
-    <g
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      transform={transform}
-      style={{ cursor: layer.locked ? 'not-allowed' : 'move' }}
-    >
-      <rect
-        x={layer.x}
-        y={layer.y}
-        width={layer.width}
-        height={layer.height}
-        fill={fill?.color || '#1e1e24'}
-        stroke={stroke?.color || 'transparent'}
-        strokeWidth={stroke?.width || 0}
-        strokeDasharray={strokeDasharray}
-        rx={layer.cornerRadius || 0}
-        ry={layer.cornerRadius || 0}
-        opacity={layer.opacity}
-        filter={filter || undefined}
-      />
-      {layer.children?.map((childId: string) => {
-        const child = doc.layers[childId];
-        if (!child) return null;
-        return (
-          <LayerNode
-            key={childId}
-            layer={child}
-            doc={doc}
-            selected={false}
-            hovered={false}
-            onClick={(e) => {
-              e.stopPropagation();
-              onClick(e);
-            }}
-            onMouseEnter={() => {}}
-            onMouseLeave={() => {}}
-          />
-        );
-      })}
-      <text
-        x={layer.x + 4}
-        y={layer.y - 6}
-        fontSize={11}
-        fill="#6b7280"
-        fontFamily="var(--font-sans)"
-      >
-        {layer.name}
-      </text>
-    </g>
-  );
-}
-function GroupLayerNode({
-  layer,
-  doc,
-  onClick,
-  onDoubleClick,
-  onMouseEnter,
-  onMouseLeave,
-}: {
-  layer: GroupLayer;
-  doc: DesignDocument;
-  selected: boolean;
-  hovered: boolean;
-  onClick: (e: React.MouseEvent) => void;
-  onDoubleClick?: (e: React.MouseEvent) => void;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
-}) {
-  const transform = getLayerTransform(layer);
-  const filter = getFilterUrl(layer);
-  return (
-    <g
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      transform={transform}
-      style={{ cursor: layer.locked ? 'not-allowed' : 'move' }}
-      opacity={layer.opacity}
-      filter={filter || undefined}
-    >
-      {layer.children?.map((childId: string) => {
-        const child = doc.layers[childId];
-        if (!child) return null;
-        return (
-          <LayerNode
-            key={childId}
-            layer={child}
-            doc={doc}
-            selected={false}
-            hovered={false}
-            onClick={(e) => {
-              e.stopPropagation();
-              onClick(e);
-            }}
-            onMouseEnter={() => {}}
-            onMouseLeave={() => {}}
-          />
-        );
-      })}
-    </g>
-  );
-}
-function RectangleLayerNode({
-  layer,
-  onClick,
-  onDoubleClick,
-  onMouseEnter,
-  onMouseLeave,
-}: {
-  layer: RectangleLayer;
-  selected: boolean;
-  hovered: boolean;
-  onClick: (e: React.MouseEvent) => void;
-  onDoubleClick?: (e: React.MouseEvent) => void;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
-}) {
-  const fill = layer.fills?.[0];
-  const stroke = layer.strokes?.[0];
-  const transform = getLayerTransform(layer);
-  const filter = getFilterUrl(layer);
-  const strokeDasharray = getStrokeDasharray(stroke);
-  return (
-    <g transform={transform} onDoubleClick={onDoubleClick}>
-      <rect
-        x={layer.x}
-        y={layer.y}
-        width={layer.width}
-        height={layer.height}
-        fill={fill?.color || 'transparent'}
-        fillOpacity={fill?.opacity ?? layer.opacity}
-        stroke={stroke?.color || 'transparent'}
-        strokeWidth={stroke?.width || 0}
-        strokeDasharray={strokeDasharray}
-        rx={layer.cornerRadius || 0}
-        ry={layer.cornerRadius || 0}
-        onClick={onClick}
-        onDoubleClick={onDoubleClick}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-        style={{ cursor: layer.locked ? 'not-allowed' : 'move' }}
-        filter={filter || undefined}
-      />
-    </g>
-  );
-}
-function EllipseLayerNode({
-  layer,
-  onClick,
-  onDoubleClick,
-  onMouseEnter,
-  onMouseLeave,
-}: {
-  layer: EllipseLayer;
-  selected: boolean;
-  hovered: boolean;
-  onClick: (e: React.MouseEvent) => void;
-  onDoubleClick?: (e: React.MouseEvent) => void;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
-}) {
-  const fill = layer.fills?.[0];
-  const stroke = layer.strokes?.[0];
-  const cx = layer.x + layer.width / 2;
-  const cy = layer.y + layer.height / 2;
-  const rx = layer.width / 2;
-  const ry = layer.height / 2;
-  const transform = getLayerTransform(layer);
-  const filter = getFilterUrl(layer);
-  const strokeDasharray = getStrokeDasharray(stroke);
-  return (
-    <g transform={transform}>
-      <ellipse
-        cx={cx}
-        cy={cy}
-        rx={rx}
-        ry={ry}
-        fill={fill?.color || 'transparent'}
-        fillOpacity={fill?.opacity ?? layer.opacity}
-        stroke={stroke?.color || 'transparent'}
-        strokeWidth={stroke?.width || 0}
-        strokeDasharray={strokeDasharray}
-        onClick={onClick}
-        onDoubleClick={onDoubleClick}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-        style={{ cursor: layer.locked ? 'not-allowed' : 'move' }}
-        filter={filter || undefined}
-      />
-    </g>
-  );
-}
-function TextLayerNode({
-  layer,
-  onClick,
-  onDoubleClick,
-  onMouseEnter,
-  onMouseLeave,
-}: {
-  layer: TextLayer;
-  selected: boolean;
-  hovered: boolean;
-  onClick: (e: React.MouseEvent) => void;
-  onDoubleClick?: (e: React.MouseEvent) => void;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
-}) {
-  const fill = layer.fills?.[0];
-  const transform = getLayerTransform(layer);
-  const filter = getFilterUrl(layer);
-  const anchor = textAlignToAnchor(layer.textAlign);
-  const textX =
-    anchor === 'middle'
-      ? layer.x + layer.width / 2
-      : anchor === 'end'
-        ? layer.x + layer.width
-        : layer.x;
-  return (
-    <g transform={transform} onDoubleClick={onDoubleClick}>
-      <text
-        x={textX}
-        y={layer.y + layer.fontSize}
-        fontSize={layer.fontSize}
-        fontWeight={layer.fontWeight}
-        fontFamily={layer.fontFamily || 'var(--font-sans)'}
-        fill={fill?.color || '#e4e4e7'}
-        opacity={layer.opacity}
-        textAnchor={anchor}
-        style={{
-          cursor: layer.locked ? 'not-allowed' : 'move',
-          userSelect: 'none',
-          letterSpacing: layer.letterSpacing
-            ? `${layer.letterSpacing}px`
-            : undefined,
-          textDecoration:
-            layer.textDecoration === 'none' ? undefined : layer.textDecoration,
-          textTransform: layer.textTransform || undefined,
-        }}
-        onClick={onClick}
-        onDoubleClick={onDoubleClick}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-        filter={filter || undefined}
-      >
-        {layer.content || 'Text'}
-      </text>
-    </g>
-  );
-}
-function StickyNoteLayerNode({
-  layer,
-  onClick,
-  onDoubleClick,
-  onMouseEnter,
-  onMouseLeave,
-}: {
-  layer: StickyNoteLayer;
-  selected: boolean;
-  hovered: boolean;
-  onClick: (e: React.MouseEvent) => void;
-  onDoubleClick?: (e: React.MouseEvent) => void;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
-}) {
-  const transform = getLayerTransform(layer);
-  const filter = getFilterUrl(layer);
-  return (
-    <g
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      transform={transform}
-      style={{ cursor: layer.locked ? 'not-allowed' : 'move' }}
-      opacity={layer.opacity}
-      filter={filter || undefined}
-    >
-      <rect
-        x={layer.x}
-        y={layer.y}
-        width={layer.width}
-        height={layer.height}
-        fill={layer.color || '#f59e0b'}
-        rx={4}
-        ry={4}
-      />
-      <text
-        x={layer.x + 8}
-        y={layer.y + layer.fontSize + 8}
-        fontSize={layer.fontSize}
-        fill={layer.textColor || '#1f2937'}
-        fontFamily="var(--font-sans)"
-      >
-        {layer.content || ''}
-      </text>
-    </g>
-  );
-}
-// --- Selection Handles ---
-function SelectionHandles({
-  layer,
-  onHandleDown,
-  showHandles,
-  zoom,
-}: {
-  layer: Layer;
-  onHandleDown: (e: React.MouseEvent, handle: string) => void;
-  showHandles: boolean;
-  zoom: number;
-}) {
-  const transform = getLayerTransform(layer);
-  const x = layer.x;
-  const y = layer.y;
-  const w = layer.width;
-  const h = layer.height;
-  const handleSize = 6 / zoom;
-  const handles = [
-    {
-      id: 'tl',
-      x: x - handleSize / 2,
-      y: y - handleSize / 2,
-      cursor: 'nwse-resize',
-    },
-    {
-      id: 'tr',
-      x: x + w - handleSize / 2,
-      y: y - handleSize / 2,
-      cursor: 'nesw-resize',
-    },
-    {
-      id: 'bl',
-      x: x - handleSize / 2,
-      y: y + h - handleSize / 2,
-      cursor: 'nesw-resize',
-    },
-    {
-      id: 'br',
-      x: x + w - handleSize / 2,
-      y: y + h - handleSize / 2,
-      cursor: 'nwse-resize',
-    },
-    {
-      id: 'tc',
-      x: x + w / 2 - handleSize / 2,
-      y: y - handleSize / 2,
-      cursor: 'ns-resize',
-    },
-    {
-      id: 'bc',
-      x: x + w / 2 - handleSize / 2,
-      y: y + h - handleSize / 2,
-      cursor: 'ns-resize',
-    },
-    {
-      id: 'ml',
-      x: x - handleSize / 2,
-      y: y + h / 2 - handleSize / 2,
-      cursor: 'ew-resize',
-    },
-    {
-      id: 'mr',
-      x: x + w - handleSize / 2,
-      y: y + h / 2 - handleSize / 2,
-      cursor: 'ew-resize',
-    },
-  ];
-  return (
-    <g transform={transform} style={{ pointerEvents: 'none' }}>
-      <rect
-        x={x}
-        y={y}
-        width={w}
-        height={h}
-        fill="none"
-        stroke="#8b5cf6"
-        strokeWidth={1.5 / zoom}
-        strokeDasharray={`${4 / zoom} ${2 / zoom}`}
-      />
-      {showHandles &&
-        handles.map((h) => (
-          <rect
-            key={h.id}
-            x={h.x}
-            y={h.y}
-            width={handleSize}
-            height={handleSize}
-            fill="#141418"
-            stroke="#8b5cf6"
-            strokeWidth={1 / zoom}
-            style={{ pointerEvents: 'auto', cursor: h.cursor }}
-            onMouseDown={(e) => onHandleDown(e, h.id)}
-          />
-        ))}
-    </g>
   );
 }

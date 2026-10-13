@@ -1,13 +1,12 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { EditorProvider } from '@/components/editor/EditorProvider';
+import { EditorInteractionProvider } from '@/components/editor/EditorInteractionProvider';
 import { TitleBar } from '@/components/editor/TitleBar';
-import { Toolbar } from '@/components/editor/Toolbar';
-import { LayerPanel } from '@/components/editor/LayerPanel';
+import { LeftPanel } from '@/components/editor/LeftPanel';
 import { PropertiesPanel } from '@/components/editor/PropertiesPanel';
 import { StatusBar } from '@/components/editor/StatusBar';
-import { AIChatPanel } from '@/components/editor/AIChatPanel';
-import { Canvas } from '@/components/canvas/Canvas';
+import { EditorCanvasStage } from '@/components/editor/EditorCanvasStage';
 import {
   OverlayHost,
   type OverlayName,
@@ -60,44 +59,43 @@ export default function EditorPage() {
 
   return (
     <EditorProvider initialDocument={initialDoc} projectId={project?.id}>
-      <div className="flex h-screen w-full flex-col overflow-hidden bg-bg-canvas text-text-primary">
-        <EditorTitleBar
-          projectName={documentName}
-          onBack={() => navigate('/dashboard')}
-          onExport={() => setOverlay('export')}
-          onOpenSettings={() => setOverlay('settings')}
-        />
-
-        <div className="flex flex-1 overflow-hidden">
-          <LayerPanel
-            collapsed={leftCollapsed}
-            onCollapse={() => setLeftCollapsed(true)}
-            onExpand={() => setLeftCollapsed(false)}
-            onOpenAssets={() => setOverlay('assets')}
+      <EditorInteractionProvider>
+        <div className="flex h-screen w-full flex-col overflow-hidden bg-bg-canvas text-text-primary">
+          <EditorTitleBar
+            projectName={documentName}
+            onBack={() => navigate('/dashboard')}
+            onExport={() => setOverlay('export')}
+            onOpenSettings={() => setOverlay('settings')}
           />
 
-          <div className="relative flex-1 overflow-hidden">
-            <Canvas />
-            <Toolbar />
-            <AIChatPanel onOpenSkills={() => setOverlay('skills')} />
+          <div className="flex flex-1 overflow-hidden">
+            <LeftPanel
+              collapsed={leftCollapsed}
+              onCollapse={() => setLeftCollapsed(true)}
+              onExpand={() => setLeftCollapsed(false)}
+            />
+
+            <div className="relative flex flex-1 overflow-hidden">
+              <EditorCanvasStage />
+            </div>
+
+            <PropertiesPanel
+              collapsed={rightCollapsed}
+              onCollapse={() => setRightCollapsed(true)}
+              onExpand={() => setRightCollapsed(false)}
+              onOpenColor={() => setOverlay('color')}
+            />
           </div>
 
-          <PropertiesPanel
-            collapsed={rightCollapsed}
-            onCollapse={() => setRightCollapsed(true)}
-            onExpand={() => setRightCollapsed(false)}
-            onOpenColor={() => setOverlay('color')}
+          <StatusBar />
+          <InitialSelection id="frame-landing" />
+          <OverlayHost
+            panel={overlay}
+            onOpen={setOverlay}
+            onClose={() => setOverlay(null)}
           />
         </div>
-
-        <StatusBar />
-        <InitialSelection id="frame-landing" />
-        <OverlayHost
-          panel={overlay}
-          onOpen={setOverlay}
-          onClose={() => setOverlay(null)}
-        />
-      </div>
+      </EditorInteractionProvider>
     </EditorProvider>
   );
 }

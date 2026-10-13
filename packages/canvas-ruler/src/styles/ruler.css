@@ -1,0 +1,121 @@
+/* stylelint-disable no-descending-specificity */
+
+/* ========== 标尺与角落方块的公共基础样式 ========== */
+.dt-canvas-ruler,
+.dt-canvas-ruler-corner {
+  /* 相对定位：让内部的刻度（absolute 定位）以标尺自身为基准 */
+  position: relative;
+
+  /* 裁掉超出标尺范围的刻度，防止刻度溢出到画布区域 */
+  overflow: hidden;
+
+  /* 背景 / 边框 / 文字跟随项目主题令牌（暗/亮色自动切换） */
+  background: var(-color-bg-panel-deep, #19191f);
+  border-color: var(-color-border, #2f2f3a);
+  color: var(-color-text-tertiary, #6e6e7a);
+}
+
+/* 水平标尺：底部画一条分隔线，与下方画布区域区分开 */
+.dt-canvas-ruler[data-canvas-ruler-axis='horizontal'] {
+  border-bottom: 1px solid var(-color-border, #2f2f3a);
+}
+
+/* 垂直标尺：右侧画一条分隔线，与右侧画布区域区分开 */
+.dt-canvas-ruler[data-canvas-ruler-axis='vertical'] {
+  border-right: 1px solid var(-color-border, #2f2f3a);
+}
+
+/* ========== 刻度容器 ========== */
+.dt-canvas-ruler-tick {
+  /* 绝对定位：位置由 JS 计算出的 left / top 决定 */
+  position: absolute;
+  font-size: 9px;
+  line-height: 1;
+}
+
+/* 水平标尺的刻度：占满整条高度，宽度 1px 形成刻度线 */
+.dt-canvas-ruler[data-canvas-ruler-axis='horizontal'] .dt-canvas-ruler-tick {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+/* 垂直标尺的刻度：占满整条宽度，高度 1px 形成刻度线 */
+.dt-canvas-ruler[data-canvas-ruler-axis='vertical'] .dt-canvas-ruler-tick {
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+/* ========== 刻度短线 ========== */
+.dt-canvas-ruler-tick-mark {
+  position: absolute;
+  background: var(-color-border-strong, #3a3a46);
+
+  /* 半透明处理，视觉上更柔和 */
+  opacity: 0.72;
+}
+
+/* 水平标尺的次刻度线：贴在底部，高 4px */
+.dt-canvas-ruler[data-canvas-ruler-axis='horizontal']
+  .dt-canvas-ruler-tick-mark {
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 4px;
+}
+
+/* 水平标尺的主刻度线：比次刻度更长，8px */
+.dt-canvas-ruler[data-canvas-ruler-axis='horizontal']
+  .dt-canvas-ruler-tick[data-ruler-tick-level='major']
+  .dt-canvas-ruler-tick-mark {
+  height: 8px;
+}
+
+/* 垂直标尺的次刻度线：贴在右侧，宽 4px */
+.dt-canvas-ruler[data-canvas-ruler-axis='vertical'] .dt-canvas-ruler-tick-mark {
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 1px;
+}
+
+/* 垂直标尺的主刻度线：比次刻度更长，8px */
+.dt-canvas-ruler[data-canvas-ruler-axis='vertical']
+  .dt-canvas-ruler-tick[data-ruler-tick-level='major']
+  .dt-canvas-ruler-tick-mark {
+  width: 8px;
+}
+
+/* ========== 数值标签 ========== */
+.dt-canvas-ruler-label {
+  /* 绝对定位：标签随刻度容器定位 */
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  font-size: 9px;
+  letter-spacing: 0;
+  color: currentcolor;
+}
+
+/* 水平标尺的标签：以刻度线为基准水平居中 */
+.dt-canvas-ruler-label-horizontal {
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+/* 垂直标尺的标签：以刻度线为基准垂直居中，并旋转 -90° 沿刻度线排列 */
+.dt-canvas-ruler-label-vertical {
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%) rotate(-90deg);
+  transform-origin: center center;
+}
+
+/* ========== 鼠标位置指示线 ========== */
+.dt-canvas-ruler-mouse-indicator {
+  position: absolute;
+  background: var(-color-brand-500, #8b5cf6);
+  pointer-events: none;
+}

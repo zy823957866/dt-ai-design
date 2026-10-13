@@ -1,4 +1,5 @@
 import './index.css';
+import '@dt-ai-design/canvas-ruler/style.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';

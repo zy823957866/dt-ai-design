@@ -1,5 +1,8 @@
-﻿import { createLayer, cloneLayer } from '@dt-ai-design/design-schema';
+import { createLayer, cloneLayer } from '@dt-ai-design/design-schema';
 import type {
+  FillStyle,
+  StrokeStyle,
+  EffectStyle,
   DesignDocument,
   Layer,
   FrameLayer,
@@ -671,4 +674,158 @@ export function duplicateLayer(
     document: doc,
     selection: { layerIds: newIds },
   };
+}
+
+// ─── Fill / Stroke / Effect 数组操作 ───
+
+type StyleArrayKey = 'fills' | 'strokes' | 'effects';
+
+function getStyleArray(layer: Layer, key: StyleArrayKey): unknown[] {
+  const arr = (layer as unknown as Record<string, unknown>)[key];
+  return Array.isArray(arr) ? arr : [];
+}
+
+function setStyleArray(
+  state: EditorState,
+  layerId: string,
+  key: StyleArrayKey,
+  value: unknown[],
+): DesignDocument {
+  const doc = deepClone(state.document);
+  const layer = doc.layers[layerId];
+  if (!layer) return state.document;
+  (layer as unknown as Record<string, unknown>)[key] = value;
+  return doc;
+}
+
+/** 追加一个 fill */
+export function appendFill(
+  state: EditorState,
+  layerId: string,
+  fill: FillStyle,
+): DesignDocument {
+  const layer = state.document.layers[layerId];
+  if (!layer) return state.document;
+  const fills = [...(getStyleArray(layer, 'fills') as FillStyle[]), fill];
+  return setStyleArray(state, layerId, 'fills', fills);
+}
+
+/** 更新指定索引的 fill */
+export function updateFill(
+  state: EditorState,
+  layerId: string,
+  index: number,
+  patch: Partial<FillStyle>,
+): DesignDocument {
+  const layer = state.document.layers[layerId];
+  if (!layer) return state.document;
+  const fills = getStyleArray(layer, 'fills') as FillStyle[];
+  if (index < 0 || index >= fills.length) return state.document;
+  const next = [...fills];
+  next[index] = { ...next[index], ...patch };
+  return setStyleArray(state, layerId, 'fills', next);
+}
+
+/** 删除指定索引的 fill */
+export function removeFill(
+  state: EditorState,
+  layerId: string,
+  index: number,
+): DesignDocument {
+  const layer = state.document.layers[layerId];
+  if (!layer) return state.document;
+  const fills = getStyleArray(layer, 'fills') as FillStyle[];
+  if (index < 0 || index >= fills.length) return state.document;
+  const next = fills.filter((_, i) => i !== index);
+  return setStyleArray(state, layerId, 'fills', next);
+}
+
+/** 追加一个 stroke */
+export function appendStroke(
+  state: EditorState,
+  layerId: string,
+  stroke: StrokeStyle,
+): DesignDocument {
+  const layer = state.document.layers[layerId];
+  if (!layer) return state.document;
+  const strokes = [
+    ...(getStyleArray(layer, 'strokes') as StrokeStyle[]),
+    stroke,
+  ];
+  return setStyleArray(state, layerId, 'strokes', strokes);
+}
+
+/** 更新指定索引的 stroke */
+export function updateStroke(
+  state: EditorState,
+  layerId: string,
+  index: number,
+  patch: Partial<StrokeStyle>,
+): DesignDocument {
+  const layer = state.document.layers[layerId];
+  if (!layer) return state.document;
+  const strokes = getStyleArray(layer, 'strokes') as StrokeStyle[];
+  if (index < 0 || index >= strokes.length) return state.document;
+  const next = [...strokes];
+  next[index] = { ...next[index], ...patch };
+  return setStyleArray(state, layerId, 'strokes', next);
+}
+
+/** 删除指定索引的 stroke */
+export function removeStroke(
+  state: EditorState,
+  layerId: string,
+  index: number,
+): DesignDocument {
+  const layer = state.document.layers[layerId];
+  if (!layer) return state.document;
+  const strokes = getStyleArray(layer, 'strokes') as StrokeStyle[];
+  if (index < 0 || index >= strokes.length) return state.document;
+  const next = strokes.filter((_, i) => i !== index);
+  return setStyleArray(state, layerId, 'strokes', next);
+}
+
+/** 追加一个 effect */
+export function appendEffect(
+  state: EditorState,
+  layerId: string,
+  effect: EffectStyle,
+): DesignDocument {
+  const layer = state.document.layers[layerId];
+  if (!layer) return state.document;
+  const effects = [
+    ...(getStyleArray(layer, 'effects') as EffectStyle[]),
+    effect,
+  ];
+  return setStyleArray(state, layerId, 'effects', effects);
+}
+
+/** 更新指定索引的 effect */
+export function updateEffect(
+  state: EditorState,
+  layerId: string,
+  index: number,
+  patch: Partial<EffectStyle>,
+): DesignDocument {
+  const layer = state.document.layers[layerId];
+  if (!layer) return state.document;
+  const effects = getStyleArray(layer, 'effects') as EffectStyle[];
+  if (index < 0 || index >= effects.length) return state.document;
+  const next = [...effects];
+  next[index] = { ...next[index], ...patch };
+  return setStyleArray(state, layerId, 'effects', next);
+}
+
+/** 删除指定索引的 effect */
+export function removeEffect(
+  state: EditorState,
+  layerId: string,
+  index: number,
+): DesignDocument {
+  const layer = state.document.layers[layerId];
+  if (!layer) return state.document;
+  const effects = getStyleArray(layer, 'effects') as EffectStyle[];
+  if (index < 0 || index >= effects.length) return state.document;
+  const next = effects.filter((_, i) => i !== index);
+  return setStyleArray(state, layerId, 'effects', next);
 }

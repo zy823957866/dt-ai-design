@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef, type RefObject } from 'react';
+﻿import { useState, useEffect, useRef, type RefObject } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   PenTool,
   Search,
-  Clock,
+  History as HistoryIcon,
+  Command,
   LayoutTemplate,
   Settings as SettingsIcon,
-  Grid3x3,
+  LayoutGrid,
   List,
   Plus,
   ChevronDown,
@@ -37,7 +38,7 @@ import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 
 type ViewMode = 'grid' | 'list';
 type Section = 'recent' | 'templates';
-type TimeFilter = 'today' | 'week' | 'month' | 'all';
+type SortMode = 'modified' | 'name-asc' | 'name-desc';
 
 interface FileCard {
   id: string;
@@ -51,11 +52,10 @@ interface FileCard {
 const HOUR = 3600_000;
 const DAY = 24 * HOUR;
 
-const TIME_FILTERS: Array<{ id: TimeFilter; label: string }> = [
-  { id: 'today', label: 'Today' },
-  { id: 'week', label: 'Last Week' },
-  { id: 'month', label: 'Last Month' },
-  { id: 'all', label: 'All' },
+const SORT_OPTIONS: Array<{ id: SortMode; label: string }> = [
+  { id: 'modified', label: 'Last modified' },
+  { id: 'name-asc', label: 'Name Au{2013}Z' },
+  { id: 'name-desc', label: 'Name Zu{2013}A' },
 ];
 
 const SAMPLE_FILES: FileCard[] = [
@@ -143,7 +143,7 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [section, setSection] = useState<Section>('recent');
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
+  const [sortMode, setSortMode] = useState<SortMode>('modified');
 
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('未命名设计');
@@ -196,10 +196,13 @@ export default function DashboardPage() {
       !f.name.toLowerCase().includes(searchQuery.toLowerCase())
     )
       return false;
-    if (timeFilter === 'today') return f.ageMs < DAY;
-    if (timeFilter === 'week') return f.ageMs < 7 * DAY;
-    if (timeFilter === 'month') return f.ageMs < 30 * DAY;
     return true;
+  });
+
+  const sortedFiles = [...filteredFiles].sort((a, b) => {
+    if (sortMode === 'name-asc') return a.name.localeCompare(b.name);
+    if (sortMode === 'name-desc') return b.name.localeCompare(a.name);
+    return b.ageMs - a.ageMs;
   });
 
   const startRename = (file: FileCard) => {
@@ -286,7 +289,7 @@ export default function DashboardPage() {
     <div className="flex h-screen w-full flex-col overflow-hidden bg-bg-canvas text-text-primary">
       {/* Top bar */}
       <header className="flex h-14 shrink-0 items-center border-b border-border bg-bg-panel px-5">
-        <div className="flex items-center gap-2.5">
+        <div className="flex w-52 items-center gap-2.5">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-white">
             <PenTool className="h-[15px] w-[15px]" />
           </div>
@@ -296,15 +299,24 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex flex-1 justify-center px-6">
-          <div className="flex h-8 w-[360px] items-center gap-2.5 rounded-lg bg-bg-input px-3">
-            <Search className="h-[13px] w-[13px] text-text-tertiary" />
+          <div className="flex h-8 w-[360px] items-center gap-2 rounded-lg bg-bg-input px-3">
+            <Search className="h-[13px] w-[13px] shrink-0 text-text-tertiary" />
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search files, templates, components…"
               className="h-6 flex-1 border-0 bg-transparent p-0 text-xs text-text-primary outline-none placeholder:text-text-tertiary"
             />
-            <kbd className="text-[10.5px] text-text-tertiary">⌘K</kbd>
+            <Command className="h-3 w-3 shrink-0 text-text-tertiary" />
+          </div>
+        </div>
+
+        <div className="flex w-52 items-center justify-end pr-3">
+          <div
+            className="flex h-7 w-7 items-center justify-center rounded-full"
+            style={{ backgroundColor: '#8B5CF6' }}
+          >
+            <span className="text-[11px] font-bold text-white">A</span>
           </div>
         </div>
       </header>
@@ -312,9 +324,9 @@ export default function DashboardPage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <aside className="flex w-[200px] shrink-0 flex-col border-r border-border bg-bg-panel py-3">
-          <nav className="px-3">
+          <nav className="flex flex-col gap-0.5 px-3">
             <SidebarItem
-              icon={<Clock className="h-[15px] w-[15px]" />}
+              icon={<HistoryIcon className="h-[15px] w-[15px]" />}
               label="Recent"
               active={section === 'recent'}
               onClick={() => setSection('recent')}
@@ -325,13 +337,15 @@ export default function DashboardPage() {
               active={section === 'templates'}
               onClick={() => setSection('templates')}
             />
-            <div className="my-1 ml-3 h-px w-[176px] bg-border" />
+            <div className="h-2" />
+            <div className="h-px bg-border" />
             <SidebarItem
               icon={<SettingsIcon className="h-[15px] w-[15px]" />}
               label="Settings"
               active={false}
               onClick={() => setShowSettings(true)}
             />
+            <div className="h-3" />
           </nav>
         </aside>
 
@@ -343,40 +357,38 @@ export default function DashboardPage() {
                 {/* Header */}
                 <div className="flex items-center">
                   <div>
-                    <h1 className="text-[22px] font-bold text-text-primary">
-                      Recent files
-                    </h1>
-                    <p className="mt-1 text-xs text-text-tertiary">
-                      {filteredFiles.length} files · Synced 2 minutes ago
-                    </p>
+                    <div className="flex flex-col gap-[2px]">
+                      <h1 className="text-[22px] font-bold text-text-primary">
+                        Recent files
+                      </h1>
+                      <p className="text-xs text-text-tertiary">
+                        {filteredFiles.length} files · Synced 2 minutes ago
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="ml-auto flex items-center gap-2">
+                  <div className="ml-auto flex items-center gap-2.5">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <button className="flex h-8 w-[120px] items-center justify-between gap-1.5 rounded-lg bg-bg-input px-3 text-xs text-text-secondary hover:text-text-primary">
+                        <button className="flex h-8 items-center gap-1.5 rounded-lg bg-bg-input px-3 text-xs text-text-secondary hover:text-text-primary">
                           <span className="truncate">
-                            {
-                              TIME_FILTERS.find((t) => t.id === timeFilter)
-                                ?.label
-                            }
+                            {SORT_OPTIONS.find((s) => s.id === sortMode)?.label}
                           </span>
                           <ChevronDown className="h-3 w-3 shrink-0 text-text-tertiary" />
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
                         align="end"
-                        style={{ width: 140 }}
-                        className="min-w-[140px]"
+                        className="min-w-[150px]"
                       >
-                        {TIME_FILTERS.map((t) => (
+                        {SORT_OPTIONS.map((s) => (
                           <DropdownMenuItem
-                            key={t.id}
-                            onClick={() => setTimeFilter(t.id)}
+                            key={s.id}
+                            onClick={() => setSortMode(s.id)}
                             className="justify-between"
                           >
-                            {t.label}
-                            {timeFilter === t.id && (
+                            {s.label}
+                            {sortMode === s.id && (
                               <Check className="h-3.5 w-3.5 text-accent-strong" />
                             )}
                           </DropdownMenuItem>
@@ -384,12 +396,12 @@ export default function DashboardPage() {
                       </DropdownMenuContent>
                     </DropdownMenu>
 
-                    <div className="flex h-8 items-center rounded-lg bg-bg-input p-[3px]">
+                    <div className="flex h-8 items-center gap-0.5 rounded-lg bg-bg-input p-[3px]">
                       <button
                         onClick={() => setViewMode('grid')}
                         className={`flex h-[26px] w-7 items-center justify-center rounded-md ${viewMode === 'grid' ? 'bg-bg-elevated text-text-primary' : 'text-text-tertiary'}`}
                       >
-                        <Grid3x3 className="h-[13px] w-[13px]" />
+                        <LayoutGrid className="h-[13px] w-[13px]" />
                       </button>
                       <button
                         onClick={() => setViewMode('list')}
@@ -399,7 +411,7 @@ export default function DashboardPage() {
                       </button>
                     </div>
 
-                    <button className="flex h-8 items-center rounded-lg bg-bg-input px-3 text-xs text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary">
+                    <button className="flex h-8 items-center rounded-lg border border-border bg-transparent px-3.5 text-xs text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary">
                       Import
                     </button>
 
@@ -408,7 +420,7 @@ export default function DashboardPage() {
                         setNewProjectName('未命名设计');
                         setNewDialogOpen(true);
                       }}
-                      className="flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-white transition-colors hover:bg-brand-500"
+                      className="flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3.5 text-xs font-semibold text-white transition-colors hover:bg-brand-500"
                     >
                       <Plus className="h-[13px] w-[13px]" />
                       New file
@@ -422,8 +434,8 @@ export default function DashboardPage() {
                     <Loader2 className="h-6 w-6 animate-spin text-text-tertiary" />
                   </div>
                 ) : viewMode === 'grid' ? (
-                  <div className="mt-7 grid grid-cols-4 gap-4">
-                    {filteredFiles.map((file) => (
+                  <div className="mt-5 grid grid-cols-4 gap-4">
+                    {sortedFiles.map((file) => (
                       <FileCardView
                         key={file.id}
                         file={file}
@@ -447,8 +459,8 @@ export default function DashboardPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="mt-7 overflow-hidden rounded-xl border border-border bg-bg-panel">
-                    {filteredFiles.map((file) => {
+                  <div className="mt-5 overflow-hidden rounded-xl border border-border bg-bg-panel">
+                    {sortedFiles.map((file) => {
                       const project = projects.find((p) => p.id === file.id);
                       return (
                         <div
@@ -685,8 +697,35 @@ function FileCardView({
   onCancelRename: () => void;
 }) {
   return (
-    <div className="group flex h-[220px] w-full flex-col overflow-hidden rounded-xl border border-border bg-bg-panel transition-colors hover:border-border-strong">
-      <button onClick={onOpen} className="h-[169px] w-full shrink-0">
+    <div className="group relative flex h-[220px] w-full flex-col overflow-hidden rounded-xl border border-border bg-bg-panel transition-colors hover:border-border-strong">
+      {project && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-md bg-bg-panel/80 text-text-tertiary opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:bg-bg-hover">
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onOpen}>
+              <FolderOpen className="mr-2 h-4 w-4" />
+              Open
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onDuplicate(project)}>
+              <Copy className="mr-2 h-4 w-4" />
+              Duplicate
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-error"
+              onClick={() => onDelete(project)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+      <button onClick={onOpen} className="flex-1 w-full min-h-0">
         <span
           className="block h-full w-full"
           style={{
@@ -694,21 +733,21 @@ function FileCardView({
           }}
         />
       </button>
-      <div className="flex h-[51px] items-center px-2.5">
-        <div className="min-w-0 flex-1">
-          {renaming ? (
-            <input
-              ref={renameRef}
-              value={renameValue}
-              onChange={(e) => onRenameChange(e.target.value)}
-              onBlur={onCommitRename}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') onCommitRename();
-                if (e.key === 'Escape') onCancelRename();
-              }}
-              className="h-[18px] w-full border-0 bg-bg-input px-1.5 text-[12.5px] text-text-primary outline-none ring-1 ring-accent"
-            />
-          ) : (
+      <div className="flex flex-col gap-[3px] p-2.5">
+        {renaming ? (
+          <input
+            ref={renameRef}
+            value={renameValue}
+            onChange={(e) => onRenameChange(e.target.value)}
+            onBlur={onCommitRename}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onCommitRename();
+              if (e.key === 'Escape') onCancelRename();
+            }}
+            className="h-[18px] w-full border-0 bg-bg-input px-1.5 text-[12.5px] text-text-primary outline-none ring-1 ring-accent"
+          />
+        ) : (
+          <>
             <div
               title="Double click to rename"
               onDoubleClick={onStartRename}
@@ -716,35 +755,8 @@ function FileCardView({
             >
               {file.name}
             </div>
-          )}
-          <div className="text-[11px] text-text-tertiary">{file.time}</div>
-        </div>
-        {project && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex h-6 w-6 items-center justify-center rounded-md text-text-tertiary opacity-0 transition-opacity group-hover:opacity-100 hover:bg-bg-hover">
-                <MoreHorizontal className="h-4 w-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onOpen}>
-                <FolderOpen className="mr-2 h-4 w-4" />
-                Open
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDuplicate(project)}>
-                <Copy className="mr-2 h-4 w-4" />
-                Duplicate
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-error"
-                onClick={() => onDelete(project)}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            <div className="text-[11px] text-text-tertiary">{file.time}</div>
+          </>
         )}
       </div>
     </div>

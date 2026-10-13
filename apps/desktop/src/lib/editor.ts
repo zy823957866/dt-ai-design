@@ -90,3 +90,36 @@ export function useEditor(): EditorApi {
   }
   return ctx;
 }
+
+import { useSyncExternalStore } from 'react';
+
+/**
+ * 获取编辑器快照的 hook。
+ *
+ * 基于 useSyncExternalStore 订阅编辑器的所有状态变化，
+ * 每次 document/selection/viewport/tool 变化都会返回新快照。
+ * 适合用在「需要用状态派生渲染」的组件里，避免手动订阅 + forceUpdate。
+ *
+ * 注意：这个 hook 会在任何变化时重渲染，所以尽量用在容器组件，
+ * 深层 UI 组件如果只需要部分状态，可以用 selector 自己 memo 一下。
+ */
+export function useEditorState() {
+  const editor = useEditor();
+
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      const offChange = editor.subscribe('change', onStoreChange);
+      const offSelection = editor.subscribe('selectionChange', onStoreChange);
+      const offViewport = editor.subscribe('viewportChange', onStoreChange);
+      const offTool = editor.subscribe('toolChange', onStoreChange);
+      return () => {
+        offChange();
+        offSelection();
+        offViewport();
+        offTool();
+      };
+    },
+    () => editor.getState(),
+    () => editor.getState(),
+  );
+}

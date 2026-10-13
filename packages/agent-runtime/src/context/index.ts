@@ -1,9 +1,9 @@
-import type { EditorSchema } from '@dt-ai-design/editor-core';
+﻿import type { DesignDocument } from '@dt-ai-design/design-schema';
 
 export interface AgentContext {
   sessionId: string;
   /** 当前编辑文档的时间线/数据模型快照。 */
-  schema?: EditorSchema;
+  document?: DesignDocument;
 }
 
 /** Agent 上下文管理（占位实现）。 */

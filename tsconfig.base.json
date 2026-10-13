@@ -1,4 +1,4 @@
-{
+﻿{
   "compilerOptions": {
     "target": "ESNext",
     "module": "ESNext",
@@ -26,7 +26,8 @@
       ],
       "@dt-ai-design/agent-provider-codex": [
         "./packages/agent-provider-codex/src/index.ts"
-      ]
+      ],
+      "@dt-ai-design/canvas-ruler": ["./packages/canvas-ruler/src/index.ts"]
     }
   }
 }

@@ -11,6 +11,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@dt-ai-design/canvas-ruler/style.css': path.resolve(
+        __dirname,
+        '../../packages/canvas-ruler/src/styles/ruler.css',
+      ),
     },
   },
   server: {
