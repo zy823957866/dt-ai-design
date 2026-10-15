@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { AgentTool } from '@dt-ai-design/agent-provider-core';
 import type { DesignDocument } from '@dt-ai-design/design-schema';
 
 import type { GenerationActivity, GenerationEvent } from '@/shared/ipc-types';
@@ -12,11 +13,18 @@ export type ChatTimelineItem =
   | { id: string; kind: 'activity'; activity: GenerationActivity }
   | { id: string; kind: 'stage'; message: string; spin: boolean };
 
+export interface GenerationStartOptions {
+  /** 生成使用的工具。 */
+  tool: AgentTool;
+  /** 传给工具的模型 id；省略时使用默认模型。 */
+  model?: string;
+}
+
 export interface GenerationController {
   items: ChatTimelineItem[];
   isRunning: boolean;
   error: string | null;
-  start: (prompt: string) => Promise<void>;
+  start: (prompt: string, options?: GenerationStartOptions) => Promise<void>;
   cancel: () => Promise<void>;
   /** 清空时间线并丢弃 main 侧会话上下文（下次生成开新会话）。 */
   reset: () => Promise<void>;
@@ -120,7 +128,10 @@ export function useGeneration({
   }, []);
 
   const start = useCallback(
-    async (prompt: string) => {
+    async (
+      prompt: string,
+      options: GenerationStartOptions = { tool: 'codex' },
+    ) => {
       const text = prompt.trim();
       if (!text || isRunning) return;
       if (!projectId) {
@@ -140,6 +151,8 @@ export function useGeneration({
           projectId,
           prompt: text,
           document: editorRef.current.getDocument(),
+          tool: options.tool,
+          model: options.model,
         });
         if (!result.success) {
           setIsRunning(false);

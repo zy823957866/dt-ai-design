@@ -12,15 +12,33 @@ import {
   StickyNote,
   Sparkles,
   Image as ImageIcon,
-  Paperclip,
   LoaderCircle,
   X,
   Check,
-  RotateCcw,
+  Star,
+  Heart,
+  Bell,
+  Settings,
+  User,
+  Plus,
+  Minus,
+  Mail,
+  Camera,
+  Pencil,
+  MapPin,
+  Lock,
+  Globe,
+  Zap,
+  History,
+  Bookmark,
+  Share2,
+  type LucideIcon,
 } from 'lucide-react';
 import { useEditor } from '@/lib/editor';
 import { useGeneration } from '@/lib/useGeneration';
 import type { ChatTimelineItem } from '@/lib/useGeneration';
+import { useAgentModel, AGENT_TOOLS } from '@/lib/useAgentModel';
+import type { AgentTool } from '@dt-ai-design/agent-provider-core';
 import type { GenerationActivity } from '@/shared/ipc-types';
 
 type LeftTab = 'chat' | 'layers' | 'assets' | 'images';
@@ -110,6 +128,88 @@ function TabIcon({ id }: { id: LeftTab }) {
   }
 }
 
+const CHAT_HISTORY = [
+  { id: '1', title: '移动端登录页设计', time: '刚刚' },
+  { id: '2', title: 'Dashboard 数据看板', time: '2h 前' },
+  { id: '3', title: '产品落地页 Hero', time: '昨天' },
+  { id: '4', title: '支付流程优化', time: '2 天前' },
+  { id: '5', title: '用户中心改版', time: '上周' },
+];
+
+function ChatHistoryBar() {
+  const [open, setOpen] = useState(false);
+  const [currentId, setCurrentId] = useState('1');
+  const current =
+    CHAT_HISTORY.find((c) => c.id === currentId) ?? CHAT_HISTORY[0];
+
+  const handleNew = () => {
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex h-[30px] flex-1 items-center gap-2 rounded-md border border-border bg-bg-input px-2 text-left hover:bg-bg-hover"
+        >
+          <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-text-primary">
+            {current.title}
+          </span>
+          <ChevronDown
+            className={`h-3 w-3 shrink-0 text-text-tertiary transition-transform ${
+              open ? 'rotate-180' : ''
+            }`}
+          />
+        </button>
+        <button
+          onClick={handleNew}
+          className="flex h-[26px] items-center gap-1 rounded-md bg-accent px-2.5 text-[11px] font-medium text-white hover:bg-brand-500"
+          title="New chat"
+        >
+          <Plus className="h-3 w-3" />
+          <span>New</span>
+        </button>
+      </div>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-[34px] z-20 w-[calc(100%-52px)] overflow-hidden rounded-lg border border-border bg-bg-popover shadow-popover">
+            <div className="max-h-[200px] overflow-y-auto py-1">
+              {CHAT_HISTORY.map((chat) => (
+                <button
+                  key={chat.id}
+                  onClick={() => {
+                    setCurrentId(chat.id);
+                    setOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-bg-hover ${
+                    chat.id === currentId ? 'bg-accent-soft' : ''
+                  }`}
+                >
+                  <span
+                    className={`min-w-0 flex-1 truncate text-[11.5px] ${
+                      chat.id === currentId
+                        ? 'text-accent-text'
+                        : 'text-text-secondary'
+                    }`}
+                  >
+                    {chat.title}
+                  </span>
+                  <span className="shrink-0 text-[10px] text-text-tertiary">
+                    {chat.time}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ============================================================
 // Chat Tab
 // ============================================================
@@ -124,12 +224,154 @@ const STAGE_LABELS: Record<string, string> = {
   cancelled: '已停止',
 };
 
+const MODEL_FALLBACK_LABEL = '默认模型';
+
+function ToolSelector({
+  tool,
+  onToolChange,
+}: {
+  tool: AgentTool;
+  onToolChange: (tool: AgentTool) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const current =
+    AGENT_TOOLS.find((option) => option.id === tool) ?? AGENT_TOOLS[0];
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-[26px] items-center gap-1.5 rounded-[13px] bg-bg-active px-2.5 text-[11px] font-semibold text-text-primary hover:bg-bg-hover"
+      >
+        <span>{current.label}</span>
+        <ChevronDown className="h-2.5 w-2.5 text-text-muted" />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute bottom-[30px] left-0 z-20 min-w-[104px] overflow-hidden rounded-lg border border-border bg-bg-popover py-1 shadow-popover">
+            {AGENT_TOOLS.map((option) => (
+              <button
+                key={option.id}
+                onClick={() => {
+                  onToolChange(option.id);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-[11.5px] hover:bg-bg-hover ${
+                  option.id === tool
+                    ? 'bg-accent-soft text-accent-text'
+                    : 'text-text-secondary'
+                }`}
+              >
+                <span>{option.label}</span>
+                {option.id === tool && <Check className="h-3 w-3" />}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ModelSelector({
+  models,
+  model,
+  loading,
+  onModelChange,
+}: {
+  models: Array<{ id: string; label: string }>;
+  model: string;
+  loading: boolean;
+  onModelChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const current = models.find((option) => option.id === model);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={loading}
+        className="flex h-[26px] items-center gap-1.5 rounded-[13px] bg-bg-active px-2.5 text-[11px] font-semibold text-text-primary hover:bg-bg-hover disabled:opacity-40"
+      >
+        <span>{current?.label ?? MODEL_FALLBACK_LABEL}</span>
+        <ChevronDown className="h-2.5 w-2.5 text-text-muted" />
+      </button>
+
+      {open && models.length > 0 && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute bottom-[30px] left-0 z-20 min-w-[104px] overflow-hidden rounded-lg border border-border bg-bg-popover py-1 shadow-popover">
+            {models.map((option) => (
+              <button
+                key={option.id}
+                onClick={() => {
+                  onModelChange(option.id);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-[11.5px] hover:bg-bg-hover ${
+                  option.id === model
+                    ? 'bg-accent-soft text-accent-text'
+                    : 'text-text-secondary'
+                }`}
+              >
+                <span>{option.label}</span>
+                {option.id === model && <Check className="h-3 w-3" />}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function CountStepper({
+  count,
+  onCountChange,
+}: {
+  count: number;
+  onCountChange: (value: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-[3px]">
+      <button
+        type="button"
+        onClick={() => onCountChange(Math.max(1, count - 1))}
+        disabled={count <= 1}
+        className="flex h-5 w-5 items-center justify-center rounded-md bg-bg-active text-text-muted hover:text-text-secondary disabled:opacity-40"
+        title="减少生成数量"
+      >
+        <Minus className="h-2.5 w-2.5" />
+      </button>
+      <span className="min-w-[14px] text-center text-[11px] font-semibold text-text-primary">
+        {count}
+      </span>
+      <button
+        type="button"
+        onClick={() => onCountChange(Math.min(9, count + 1))}
+        disabled={count >= 9}
+        className="flex h-5 w-5 items-center justify-center rounded-md bg-bg-active text-text-muted hover:text-text-secondary disabled:opacity-40"
+        title="增加生成数量"
+      >
+        <Plus className="h-2.5 w-2.5" />
+      </button>
+    </div>
+  );
+}
+
 function ChatTab({ projectId }: { projectId?: string }) {
-  const { items, isRunning, error, start, cancel, reset } = useGeneration({
+  const { items, isRunning, error, start, cancel } = useGeneration({
     projectId,
   });
+  const { tool, model, models, loading, setTool, setModel } = useAgentModel();
   const [input, setInput] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [variantCount, setVariantCount] = useState(3);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // 时间线更新时滚动到底部
@@ -143,7 +385,7 @@ function ChatTab({ projectId }: { projectId?: string }) {
     const text = input.trim();
     if (!text) return;
     setInput('');
-    void start(text);
+    void start(text, { tool, model });
   };
 
   const toggleExpanded = (id: string) => {
@@ -157,6 +399,7 @@ function ChatTab({ projectId }: { projectId?: string }) {
 
   return (
     <div className="flex h-full flex-col gap-3">
+      <ChatHistoryBar />
       <div
         ref={scrollRef}
         className="flex flex-1 flex-col gap-3 overflow-y-auto min-h-0"
@@ -189,7 +432,7 @@ function ChatTab({ projectId }: { projectId?: string }) {
         )}
       </div>
 
-      <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-bg-input p-3">
+      <div className="flex flex-col rounded-xl border border-border bg-bg-input px-3 pt-3 pb-2">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -203,27 +446,15 @@ function ChatTab({ projectId }: { projectId?: string }) {
           placeholder={isRunning ? 'AI 正在生成中…' : '描述你的设计需求…'}
           className="h-10 resize-none border-0 bg-transparent p-0 text-[12px] text-text-primary placeholder:text-text-muted outline-none disabled:opacity-60"
         />
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => void reset()}
-            disabled={isRunning || items.length === 0}
-            className="text-text-muted hover:text-text-secondary disabled:opacity-40"
-            title="新会话（清空对话与上下文）"
-          >
-            <RotateCcw className="h-[14px] w-[14px]" />
-          </button>
-          <button
-            className="text-text-muted hover:text-text-secondary"
-            title="参考图片（即将支持）"
-          >
-            <ImageIcon className="h-[14px] w-[14px]" />
-          </button>
-          <button
-            className="text-text-muted hover:text-text-secondary"
-            title="附件（即将支持）"
-          >
-            <Paperclip className="h-[14px] w-[14px]" />
-          </button>
+        <div className="mt-2.5 flex items-center gap-2.5">
+          <ToolSelector tool={tool} onToolChange={setTool} />
+          <ModelSelector
+            models={models}
+            model={model}
+            loading={loading}
+            onModelChange={setModel}
+          />
+          <CountStepper count={variantCount} onCountChange={setVariantCount} />
           <div className="flex-1" />
           {isRunning ? (
             <button
@@ -632,24 +863,24 @@ function LayerIcon({ type }: { type: string }) {
 // ============================================================
 
 const ASSET_ICONS: Array<{ name: string; icon: string }> = [
-  { name: 'star', icon: 'star' },
-  { name: 'heart', icon: 'heart' },
-  { name: 'bell', icon: 'bell' },
-  { name: 'settings', icon: 'settings' },
-  { name: 'user', icon: 'user' },
-  { name: 'search', icon: 'search' },
-  { name: 'plus', icon: 'plus' },
-  { name: 'image', icon: 'image' },
-  { name: 'mail', icon: 'mail' },
-  { name: 'camera', icon: 'camera' },
-  { name: 'pencil', icon: 'pencil' },
-  { name: 'map-pin', icon: 'map-pin' },
-  { name: 'lock', icon: 'lock' },
-  { name: 'globe', icon: 'globe' },
-  { name: 'zap', icon: 'zap' },
-  { name: 'history', icon: 'history' },
-  { name: 'bookmark', icon: 'bookmark' },
-  { name: 'share', icon: 'share' },
+  { name: 'star', icon: 'Star' },
+  { name: 'heart', icon: 'Heart' },
+  { name: 'bell', icon: 'Bell' },
+  { name: 'settings', icon: 'Settings' },
+  { name: 'user', icon: 'User' },
+  { name: 'search', icon: 'Search' },
+  { name: 'plus', icon: 'Plus' },
+  { name: 'image', icon: 'ImageIcon' },
+  { name: 'mail', icon: 'Mail' },
+  { name: 'camera', icon: 'Camera' },
+  { name: 'pencil', icon: 'Pencil' },
+  { name: 'map-pin', icon: 'MapPin' },
+  { name: 'lock', icon: 'Lock' },
+  { name: 'globe', icon: 'Globe' },
+  { name: 'zap', icon: 'Zap' },
+  { name: 'history', icon: 'History' },
+  { name: 'bookmark', icon: 'Bookmark' },
+  { name: 'share', icon: 'Share2' },
 ];
 
 const ASSET_COMPONENTS: Array<{ name: string; variants: number }> = [
@@ -674,10 +905,14 @@ function AssetsTab() {
           {ASSET_ICONS.map((item) => (
             <div
               key={item.name}
-              className="flex flex-col items-center gap-1 rounded-lg bg-[#1b1b23] py-2"
+              className="flex flex-col items-center gap-1 rounded-lg bg-bg-elevated py-2"
             >
               <div className="flex h-[22px] w-[22px] items-center justify-center text-text-secondary">
-                <AssetsIcon name={item.icon} className="h-[22px] w-[22px]" />
+                <AssetsIcon
+                  name={item.icon}
+                  className="h-[22px] w-[22px]"
+                  strokeWidth={1.75}
+                />
               </div>
               <span className="text-[10px] text-text-muted">{item.name}</span>
             </div>
@@ -697,7 +932,7 @@ function AssetsTab() {
               key={c.name}
               className="flex flex-col gap-1.5 rounded-xl border border-border bg-bg-elevated p-2.5"
             >
-              <div className="h-16 rounded-md bg-[#1b1b23]" />
+              <div className="h-16 rounded-md bg-bg-active" />
               <span className="text-[10.5px] font-medium text-text-primary">
                 {c.name}
               </span>
@@ -709,28 +944,38 @@ function AssetsTab() {
   );
 }
 
-function AssetsIcon({ name, className }: { name: string; className?: string }) {
-  const icons: Record<string, string> = {
-    star: '★',
-    heart: '♥',
-    bell: '🔔',
-    settings: '⚙',
-    user: '👤',
-    search: '🔍',
-    plus: '+',
-    image: '🖼',
-    mail: '✉',
-    camera: '📷',
-    pencil: '✎',
-    'map-pin': '📍',
-    lock: '🔒',
-    globe: '🌐',
-    zap: '⚡',
-    history: '⟲',
-    bookmark: '🔖',
-    share: '↗',
-  };
-  return <span className={className}>{icons[name] || '◆'}</span>;
+const ICON_COMPONENTS: Record<string, LucideIcon> = {
+  Star,
+  Heart,
+  Bell,
+  Settings,
+  User,
+  Search,
+  Plus,
+  ImageIcon,
+  Mail,
+  Camera,
+  Pencil,
+  MapPin,
+  Lock,
+  Globe,
+  Zap,
+  History,
+  Bookmark,
+  Share2,
+};
+
+function AssetsIcon({
+  name,
+  className,
+  strokeWidth,
+}: {
+  name: string;
+  className?: string;
+  strokeWidth?: number;
+}) {
+  const Icon = ICON_COMPONENTS[name] ?? Square;
+  return <Icon className={className} strokeWidth={strokeWidth} />;
 }
 
 // ============================================================
