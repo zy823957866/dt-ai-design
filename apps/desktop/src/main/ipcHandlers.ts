@@ -4,13 +4,16 @@ import {
   IpcSettingsChannel,
   IpcAppChannel,
   IpcGenerationChannel,
+  IpcAgentChannel,
   type OpenDialogOptions,
   type SaveDialogOptions,
   type GenerationStartInput,
 } from '../shared/ipc-types';
+import type { AgentTool } from '@dt-ai-design/agent-provider-core';
 import * as projectStore from './projectStore';
 import * as settingsStore from './settings';
 import { GenerationRuntime } from './generationRuntime';
+import { toolRegistry, resolveToolCommand } from './toolRegistry';
 import type { DesignDocument } from '@dt-ai-design/design-schema';
 
 let generationRuntime: GenerationRuntime | null = null;
@@ -103,6 +106,23 @@ export function registerIpcHandlers(): void {
         filters: options.filters,
       });
       return result.canceled ? null : result.filePath;
+    },
+  );
+
+  // ─── Agent ─────────────────────────────────────────────
+
+  ipcMain.handle(
+    IpcAgentChannel.LIST_MODELS,
+    async (_event, tool: AgentTool) => {
+      const definition = toolRegistry[tool];
+      if (!definition) return [];
+      try {
+        return await definition.listModels({
+          command: resolveToolCommand(tool),
+        });
+      } catch {
+        return [];
+      }
     },
   );
 

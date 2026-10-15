@@ -4,11 +4,13 @@ import {
   IpcSettingsChannel,
   IpcAppChannel,
   IpcGenerationChannel,
+  IpcAgentChannel,
   type DesktopAPI,
   type OpenDialogOptions,
   type SaveDialogOptions,
   type GenerationEvent,
   type GenerationStartInput,
+  type AgentTool,
 } from './shared/ipc-types';
 import type { DesignDocument } from '@dt-ai-design/design-schema';
 
@@ -50,6 +52,11 @@ const api: DesktopAPI = {
 
   showSaveDialog: (options: SaveDialogOptions) =>
     ipcRenderer.invoke(IpcAppChannel.SHOW_SAVE_DIALOG, options),
+
+  // ─── Agent ─────────────────────────────────────────────
+
+  listModels: (tool: AgentTool) =>
+    ipcRenderer.invoke(IpcAgentChannel.LIST_MODELS, tool),
 
   // ─── AI 生成 ───────────────────────────────────────────
 

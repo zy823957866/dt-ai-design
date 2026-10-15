@@ -6,10 +6,10 @@ import type { WebContents, App } from 'electron';
 
 import { AgentRun } from '@dt-ai-design/agent-runtime';
 import type { AgentEvent } from '@dt-ai-design/agent-protocol';
-import {
-  CodexProvider,
-  type CodexActivity,
-} from '@dt-ai-design/agent-provider-codex';
+import type {
+  AgentActivity,
+  AgentTool,
+} from '@dt-ai-design/agent-provider-core';
 import { Orchestrator } from '@dt-ai-design/agent-orchestrator';
 import type { DesignDocument } from '@dt-ai-design/design-schema';
 
@@ -21,7 +21,7 @@ import type {
 } from '../shared/ipc-types';
 import { IpcGenerationChannel } from '../shared/ipc-types';
 
-import { resolveCodexCommand } from './codexExecutable';
+import { createToolProvider } from './toolRegistry';
 
 interface ActiveGeneration {
   runId: string;
@@ -29,7 +29,6 @@ interface ActiveGeneration {
 }
 
 export interface GenerationRuntimeOptions {
-  command?: string;
   workspaceDir?: string;
   /** electron app 实例（便于测试注入）；默认使用 electron 的 app。 */
   app?: Pick<App, 'getPath'>;
@@ -43,18 +42,19 @@ export interface GenerationRuntimeOptions {
  * - AgentRun 事件映射为 GenerationEvent，经 webContents.send 推送到渲染层
  */
 export class GenerationRuntime {
-  private readonly provider: CodexProvider;
-  private readonly orchestrator: Orchestrator;
+  private readonly orchestrators: Record<AgentTool, Orchestrator>;
   private readonly workspaceDir: string;
   private active: ActiveGeneration | null = null;
-  /** 项目 → 最近一次成功生成的 codex threadId（多轮会话续接）。 */
-  private readonly threadIds = new Map<string, string>();
+  /** `${projectId}::${tool}` → conversationId（多轮会话续接）。 */
+  private readonly conversations = new Map<string, string>();
 
   constructor(options: GenerationRuntimeOptions = {}) {
-    this.provider = new CodexProvider({
-      command: options.command ?? resolveCodexCommand(),
-    });
-    this.orchestrator = new Orchestrator({ provider: this.provider });
+    const makeOrchestrator = (tool: AgentTool) =>
+      new Orchestrator({ provider: createToolProvider(tool) });
+    this.orchestrators = {
+      codex: makeOrchestrator('codex'),
+      opencode: makeOrchestrator('opencode'),
+    };
     this.workspaceDir =
       options.workspaceDir ??
       path.join(options.app?.getPath('userData') ?? '', 'agent-workspace');
@@ -98,7 +98,10 @@ export class GenerationRuntime {
 
   /** 丢弃项目的会话上下文，下次生成开新会话。 */
   resetThread(projectId: string): void {
-    this.threadIds.delete(projectId);
+    const prefix = `${projectId}::`;
+    for (const key of this.conversations.keys()) {
+      if (key.startsWith(prefix)) this.conversations.delete(key);
+    }
   }
 
   private async execute(
@@ -122,20 +125,22 @@ export class GenerationRuntime {
     });
 
     try {
-      const result = await this.orchestrator.generateDocument(
+      const key = `${input.projectId}::${input.tool}`;
+      const orchestrator = this.orchestrators[input.tool];
+      const result = await orchestrator.generateDocument(
         {
           prompt: input.prompt,
           document: input.document,
           cwd: this.workspaceDir,
           model: input.model,
           signal: abort.signal,
-          threadId: this.threadIds.get(input.projectId),
+          conversationId: this.conversations.get(key),
         },
         agentRun,
       );
 
-      if (result.threadId) {
-        this.threadIds.set(input.projectId, result.threadId);
+      if (result.conversationId) {
+        this.conversations.set(key, result.conversationId);
       }
       revision += 1;
       publish({
@@ -174,7 +179,7 @@ export class GenerationRuntime {
       kind?: string;
       stage?: string;
       currentStep?: string;
-      activity?: CodexActivity;
+      activity?: AgentActivity;
       text?: string;
     };
 
