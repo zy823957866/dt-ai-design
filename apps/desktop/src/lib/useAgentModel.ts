@@ -42,16 +42,21 @@ export function useAgentModel(): AgentModelController {
   // 初始化：读取持久化选择
   useEffect(() => {
     void (async () => {
-      const settings = await window.desktopAPI.getSettings();
-      const initialTool: AgentTool = TOOLS.includes(settings.tool)
-        ? settings.tool
-        : 'codex';
-      setToolState(initialTool);
-      const list = await loadModels(initialTool);
-      const initialModel = list.some((m) => m.id === settings.model)
-        ? settings.model
-        : (list[0]?.id ?? '');
-      setModelState(initialModel);
+      try {
+        const settings = await window.desktopAPI.getSettings();
+        const initialTool: AgentTool = TOOLS.includes(settings.tool)
+          ? settings.tool
+          : 'codex';
+        setToolState(initialTool);
+        const list = await loadModels(initialTool);
+        const initialModel = list.some((m) => m.id === settings.model)
+          ? settings.model
+          : (list[0]?.id ?? '');
+        setModelState(initialModel);
+      } catch {
+        void loadModels('codex');
+        setError('设置读取失败');
+      }
     })();
   }, [loadModels]);
 

@@ -110,6 +110,18 @@ export class GenerationRuntime {
     abort: AbortController,
     publish: (event: GenerationEvent) => void,
   ): Promise<void> {
+    const orchestrator = this.orchestrators[input.tool];
+    if (!orchestrator) {
+      if (this.active?.runId === runId) this.active = null;
+      publish({
+        type: 'done',
+        runId,
+        status: 'failed',
+        error: `未知的生成工具：${input.tool}`,
+      });
+      return;
+    }
+
     let revision = 0;
 
     try {
@@ -126,7 +138,6 @@ export class GenerationRuntime {
 
     try {
       const key = `${input.projectId}::${input.tool}`;
-      const orchestrator = this.orchestrators[input.tool];
       const result = await orchestrator.generateDocument(
         {
           prompt: input.prompt,

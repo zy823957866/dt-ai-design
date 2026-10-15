@@ -1,6 +1,7 @@
 import {
   spawnCli,
   readStream,
+  waitForClose,
   type AgentModelInfo,
 } from '@dt-ai-design/agent-provider-core';
 
@@ -27,10 +28,7 @@ export const listOpencodeModels = async (
   ]);
   const stdout =
     stdoutResult[0].status === 'fulfilled' ? stdoutResult[0].value : '';
-  await new Promise<void>((resolve) => {
-    if (child.exitCode !== null || child.signalCode !== null) resolve();
-    else child.once('close', () => resolve());
-  });
+  await waitForClose(child);
   if (spawnError) return [];
   try {
     return parseOpencodeModels(stdout);

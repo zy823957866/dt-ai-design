@@ -3,6 +3,7 @@ export {
   resolveSpawnTarget,
   spawnCli,
   terminateTree,
+  waitForClose,
   readLines,
   readStream,
   type SpawnTarget,

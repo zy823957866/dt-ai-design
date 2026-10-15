@@ -72,6 +72,30 @@ export const readLines = async (
   if (tail) onLine(tail);
 };
 
+/** Resolve when the child closes, or terminate it after `timeoutMs`. */
+export const waitForClose = (
+  child: ChildProcess,
+  timeoutMs = 15000,
+): Promise<void> =>
+  new Promise((resolve) => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      resolve();
+      return;
+    }
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      terminateTree(child);
+      done();
+    }, timeoutMs);
+    child.once('close', done);
+  });
+
 /** 读取流为字符串，可选保留末尾 maxLength 字符。 */
 export const readStream = async (
   stream: Readable | null,

@@ -1,6 +1,7 @@
 import {
   spawnCli,
   readStream,
+  waitForClose,
   type AgentModelInfo,
 } from '@dt-ai-design/agent-provider-core';
 
@@ -37,14 +38,13 @@ export const listCodexModels = async (
     spawnError = error;
   });
   // 排空 stdout/stderr，避免管道写满导致子进程挂起
-  const stdout = await readStream(child.stdout, () => undefined).catch(
-    () => '',
-  );
-  await readStream(child.stderr, () => undefined).catch(() => undefined);
-  await new Promise<void>((resolve) => {
-    if (child.exitCode !== null || child.signalCode !== null) resolve();
-    else child.once('close', () => resolve());
-  });
+  const stdoutResult = await Promise.allSettled([
+    readStream(child.stdout, () => undefined).catch(() => ''),
+    readStream(child.stderr, () => undefined).catch(() => undefined),
+  ]);
+  const stdout =
+    stdoutResult[0].status === 'fulfilled' ? stdoutResult[0].value : '';
+  await waitForClose(child);
   if (spawnError) return [];
   try {
     return parseCodexModels(JSON.parse(stdout));
