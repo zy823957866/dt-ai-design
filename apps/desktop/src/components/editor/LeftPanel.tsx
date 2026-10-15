@@ -368,7 +368,15 @@ function ChatTab({ projectId }: { projectId?: string }) {
   const { items, isRunning, error, start, cancel } = useGeneration({
     projectId,
   });
-  const { tool, model, models, loading, setTool, setModel } = useAgentModel();
+  const {
+    tool,
+    model,
+    models,
+    loading,
+    error: modelError,
+    setTool,
+    setModel,
+  } = useAgentModel();
   const [input, setInput] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [variantCount, setVariantCount] = useState(3);
@@ -446,6 +454,9 @@ function ChatTab({ projectId }: { projectId?: string }) {
           placeholder={isRunning ? 'AI 正在生成中…' : '描述你的设计需求…'}
           className="h-10 resize-none border-0 bg-transparent p-0 text-[12px] text-text-primary placeholder:text-text-muted outline-none disabled:opacity-60"
         />
+        {modelError && (
+          <div className="mt-1 text-[11px] text-red-400">{modelError}</div>
+        )}
         <div className="mt-2.5 flex items-center gap-2.5">
           <ToolSelector tool={tool} onToolChange={setTool} />
           <ModelSelector
