@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCodexModels } from '../models';
+import { listCodexModels, parseCodexModels } from '../models';
 
 describe('parseCodexModels', () => {
   it('maps listable models to id/label and filters visibility', () => {
@@ -27,5 +27,13 @@ describe('parseCodexModels', () => {
   it('returns empty for malformed input', () => {
     expect(parseCodexModels(null)).toEqual([]);
     expect(parseCodexModels({})).toEqual([]);
+  });
+});
+
+describe('listCodexModels', () => {
+  it('resolves to [] when the codex binary is missing', async () => {
+    await expect(
+      listCodexModels({ command: 'definitely-not-real-xyz-12345' }),
+    ).resolves.toEqual([]);
   });
 });

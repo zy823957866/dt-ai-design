@@ -31,10 +31,23 @@ export const listCodexModels = async (
 ): Promise<AgentModelInfo[]> => {
   const command = options.command ?? process.env.CODEX_CLI_PATH ?? 'codex';
   const child = spawnCli(command, ['debug', 'models']);
-  const out = await readStream(child.stdout, () => undefined);
-  await new Promise<void>((resolve) => child.once('close', () => resolve()));
+  // 缺少 codex 时 child 会 emit 'error'；必须挂监听，否则未处理事件会拖垮宿主进程
+  let spawnError: Error | undefined;
+  child.once('error', (error) => {
+    spawnError = error;
+  });
+  // 排空 stdout/stderr，避免管道写满导致子进程挂起
+  const stdout = await readStream(child.stdout, () => undefined).catch(
+    () => '',
+  );
+  await readStream(child.stderr, () => undefined).catch(() => undefined);
+  await new Promise<void>((resolve) => {
+    if (child.exitCode !== null || child.signalCode !== null) resolve();
+    else child.once('close', () => resolve());
+  });
+  if (spawnError) return [];
   try {
-    return parseCodexModels(JSON.parse(out));
+    return parseCodexModels(JSON.parse(stdout));
   } catch {
     return [];
   }

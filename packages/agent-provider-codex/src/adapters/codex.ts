@@ -9,6 +9,7 @@ import {
   terminateTree,
   type AgentExecRequest,
   type AgentExecResult,
+  type AgentProvider,
 } from '@dt-ai-design/agent-provider-core';
 
 import { parseCodexJsonlEvent, parseCodexThreadId } from '../jsonl';
@@ -31,7 +32,7 @@ const MAX_STDERR_LENGTH = 16000;
  * - conversation.type === 'resume' 时用 `codex exec resume <id>` 延续会话
  * - AbortSignal 触发时终止进程（Windows 下 taskkill /T 树杀）
  */
-export class CodexProvider {
+export class CodexProvider implements AgentProvider {
   private readonly command: string;
   private readonly env?: Record<string, string>;
 
@@ -124,13 +125,12 @@ export class CodexProvider {
       });
 
       let stderr = '';
-      const stderrDone = readStream(
-        child.stderr,
-        (text) => {
-          stderr += text;
-        },
-        MAX_STDERR_LENGTH,
-      ).catch(() => undefined);
+      const stderrDone = readStream(child.stderr, (text) => {
+        stderr += text;
+        if (stderr.length > MAX_STDERR_LENGTH) {
+          stderr = stderr.slice(-MAX_STDERR_LENGTH);
+        }
+      }).catch(() => undefined);
 
       const stdoutDone = readLines(child.stdout, handleLine).catch(
         () => undefined,
