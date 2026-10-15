@@ -9,19 +9,17 @@ export { buildDocumentPrompt, assembleDocument } from './prompt';
 import type { AgentCommand } from '@dt-ai-design/agent-protocol';
 import { AgentRun, type EventListener } from '@dt-ai-design/agent-runtime';
 import {
-  CodexExecError,
-  CodexProvider,
-  type CodexExecEvent,
-} from '@dt-ai-design/agent-provider-codex';
+  AgentExecError,
+  type AgentExecEvent,
+  type AgentProvider,
+} from '@dt-ai-design/agent-provider-core';
 import type { DesignDocument } from '@dt-ai-design/design-schema';
 
 import { Validator } from './validator';
 import { assembleDocument, buildDocumentPrompt } from './prompt';
 
 export interface OrchestratorOptions {
-  provider?: CodexProvider;
-  planner?: Planner;
-  executor?: Executor;
+  provider: AgentProvider;
   validator?: Validator;
   /** 校验失败后的修复重试次数，默认 1（共最多 2 次 codex 调用）。 */
   maxRepairAttempts?: number;
@@ -34,13 +32,13 @@ export interface GenerateInput {
   cwd: string;
   model?: string;
   signal?: AbortSignal;
-  /** 已有会话的 threadId；传入则 resume 续会话（多轮迭代设计）。 */
-  threadId?: string;
+  /** 已有会话的 conversationId；传入则 resume 续会话（多轮迭代设计）。 */
+  conversationId?: string;
 }
 
 export interface GenerateResult {
   document: DesignDocument;
-  threadId?: string;
+  conversationId?: string;
 }
 
 /**
@@ -50,15 +48,15 @@ export interface GenerateResult {
  *   组 prompt（需求 + 当前文档 + 格式说明）
  *   → codex exec（结构化 JSON 输出，转发 bash 活动 / 消息事件）
  *   → Zod 校验
- *   → 失败则把诊断拼进 prompt 修复重跑（复用 threadId 续会话）
+ *   → 失败则把诊断拼进 prompt 修复重跑（复用 conversationId 续会话）
  */
 export class Orchestrator {
-  private provider: CodexProvider;
+  private provider: AgentProvider;
   private validator: Validator;
   private maxRepairAttempts: number;
 
-  constructor(options: OrchestratorOptions = {}) {
-    this.provider = options.provider ?? new CodexProvider();
+  constructor(options: OrchestratorOptions) {
+    this.provider = options.provider;
     this.validator = options.validator ?? new Validator();
     this.maxRepairAttempts = options.maxRepairAttempts ?? 1;
   }
@@ -86,7 +84,7 @@ export class Orchestrator {
       );
       run.complete({
         document: result.document,
-        threadId: result.threadId,
+        conversationId: result.conversationId,
       });
     } catch (err) {
       if (!run.isCancelled() && run.getStage() !== 'failed') {
@@ -113,11 +111,11 @@ export class Orchestrator {
 
     const maxAttempts = 1 + Math.max(0, this.maxRepairAttempts);
     let lastErrors: string[] = [];
-    let threadId: string | undefined = input.threadId;
+    let conversationId: string | undefined = input.conversationId;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       if (input.signal?.aborted) {
-        throw new CodexExecError({
+        throw new AgentExecError({
           code: 'cancelled',
           message: '生成已取消。',
         });
@@ -137,14 +135,16 @@ export class Orchestrator {
           repairErrors: attempt > 1 ? lastErrors : undefined,
         }),
         cwd: input.cwd,
-        sandbox: 'workspace-write',
-        conversation: threadId ? { type: 'resume', threadId } : { type: 'new' },
+        access: 'workspace-write',
+        conversation: conversationId
+          ? { type: 'resume', id: conversationId }
+          : { type: 'new' },
         model: input.model,
         responseFormat: 'json',
         signal: input.signal,
         onEvent: (event) => forwardEvent(run, event),
       });
-      threadId = result.threadId;
+      conversationId = result.conversationId;
 
       let candidate: DesignDocument;
       try {
@@ -157,7 +157,7 @@ export class Orchestrator {
       run.setStage('validating', '正在校验生成结果');
       const verdict = this.validator.validate(candidate);
       if (verdict.valid) {
-        return { document: candidate, threadId };
+        return { document: candidate, conversationId };
       }
 
       lastErrors = verdict.errors;
@@ -171,8 +171,8 @@ export class Orchestrator {
   }
 }
 
-/** 把 codex 事件转发到 AgentRun 事件总线（驱动 UI 时间线）。 */
-const forwardEvent = (run: AgentRun, event: CodexExecEvent): void => {
+/** 把 provider 事件转发到 AgentRun 事件总线（驱动 UI 时间线）。 */
+const forwardEvent = (run: AgentRun, event: AgentExecEvent): void => {
   if (event.type === 'activity') {
     run.emit({
       type: 'agent:step',

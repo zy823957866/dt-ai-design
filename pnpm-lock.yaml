@@ -398,9 +398,9 @@ importers:
       '@dt-ai-design/agent-protocol':
         specifier: workspace:*
         version: link:../agent-protocol
-      '@dt-ai-design/agent-provider-codex':
+      '@dt-ai-design/agent-provider-core':
         specifier: workspace:*
-        version: link:../agent-provider-codex
+        version: link:../agent-provider-core
       '@dt-ai-design/agent-runtime':
         specifier: workspace:*
         version: link:../agent-runtime

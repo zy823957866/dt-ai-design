@@ -1,9 +1,9 @@
 import { AgentRun } from '@dt-ai-design/agent-runtime';
-import { CodexProvider } from '@dt-ai-design/agent-provider-codex';
+import type { AgentProvider } from '@dt-ai-design/agent-provider-core';
 import type { PlanStep, GenerationPlan } from '../planner';
 
 export interface ExecutorOptions {
-  provider?: CodexProvider;
+  provider: AgentProvider;
 }
 
 /**
@@ -12,10 +12,10 @@ export interface ExecutorOptions {
  * 执行过程中所有事件通过绑定的 AgentRun 向外转发。
  */
 export class Executor {
-  private provider: CodexProvider;
+  private provider: AgentProvider;
 
-  constructor(options: ExecutorOptions = {}) {
-    this.provider = options.provider ?? new CodexProvider();
+  constructor(options: ExecutorOptions) {
+    this.provider = options.provider;
   }
 
   /**
