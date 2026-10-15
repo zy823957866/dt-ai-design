@@ -1,5 +1,8 @@
 export { CodexProvider, type CodexProviderOptions } from './adapters/codex';
-export { parseCodexJsonlEvent, extractJson } from './jsonl';
+export { parseCodexJsonlEvent } from './jsonl';
+export { parseCodexModels, listCodexModels } from './models';
+export { codexTool } from './tools';
+export { extractJson } from '@dt-ai-design/agent-provider-core';
 export type {
   CodexSandbox,
   CodexConversation,
@@ -9,4 +12,4 @@ export type {
   CodexExecResult,
   CodexErrorCode,
 } from './types';
-export { CodexExecError } from './types';
+export { AgentExecError as CodexExecError } from '@dt-ai-design/agent-provider-core';

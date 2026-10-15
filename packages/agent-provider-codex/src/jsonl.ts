@@ -1,4 +1,7 @@
-import type { CodexExecEvent } from './types';
+import {
+  summarizeText,
+  type AgentExecEvent,
+} from '@dt-ai-design/agent-provider-core';
 
 /**
  * codex exec --json 的 stdout JSONL 事件解析。
@@ -14,8 +17,6 @@ import type { CodexExecEvent } from './types';
  *
  * 未知的 type / item 类型一律忽略，保证对版本差异宽容。
  */
-
-const MAX_SUMMARY_LENGTH = 2000;
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -37,20 +38,13 @@ const readError = (value: unknown): { code: string; message: string } => {
   };
 };
 
-const summarize = (value: unknown, fallback: string) => {
-  const text = readString(value)?.trim() || fallback;
-  return text.length <= MAX_SUMMARY_LENGTH
-    ? text
-    : `${text.slice(0, MAX_SUMMARY_LENGTH - 3)}...`;
-};
-
 const mapCommandItem = ({
   phase,
   item,
 }: {
   phase: 'started' | 'completed';
   item: Record<string, unknown>;
-}): CodexExecEvent | null => {
+}): AgentExecEvent | null => {
   const id = readString(item.id);
   const command = readString(item.command);
   if (!id || !command) return null;
@@ -67,7 +61,7 @@ const mapCommandItem = ({
   const exitCode = readNumber(item.exit_code);
   const failed =
     item.status === 'failed' || (exitCode !== undefined && exitCode !== 0);
-  const summary = summarize(
+  const summary = summarizeText(
     item.aggregated_output ?? item.output,
     failed ? 'Command failed.' : 'Command completed.',
   );
@@ -106,7 +100,7 @@ const mapCommandItem = ({
 };
 
 /** 解析单行 JSONL；非 JSON 行（日志噪音）与未知事件返回 null。 */
-export const parseCodexJsonlEvent = (line: string): CodexExecEvent | null => {
+export const parseCodexJsonlEvent = (line: string): AgentExecEvent | null => {
   let event: unknown;
   try {
     event = JSON.parse(line);
@@ -116,12 +110,10 @@ export const parseCodexJsonlEvent = (line: string): CodexExecEvent | null => {
   if (!isObject(event)) return null;
 
   switch (event.type) {
-    case 'thread.started': {
-      const threadId = readString(event.thread_id);
-      return threadId ? { type: 'thread-started', threadId } : null;
-    }
+    case 'thread.started':
+      return { type: 'step-started' };
     case 'turn.started':
-      return { type: 'turn-started' };
+      return { type: 'step-started' };
     case 'turn.completed':
       return {
         type: 'turn-completed',
@@ -156,42 +148,18 @@ export const parseCodexJsonlEvent = (line: string): CodexExecEvent | null => {
 };
 
 /**
- * 从最终消息文本中提取 JSON。
- * 依次尝试：原文 / 剥 markdown 代码栅栏 / 截取首个 { 或 [ 到匹配的收尾。
+ * 从原始 JSONL 行中提取 codex thread_id。
+ *
+ * AgentExecEvent 不承载 threadId，故 codex 适配层需单独解析 thread.started。
  */
-export const extractJson = (message: string): unknown => {
-  const trimmed = message.trim();
-  const withoutFence = trimmed
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```$/, '');
-
-  const objectStart = withoutFence.indexOf('{');
-  const arrayStart = withoutFence.indexOf('[');
-  const start =
-    objectStart < 0
-      ? arrayStart
-      : arrayStart < 0
-        ? objectStart
-        : Math.min(objectStart, arrayStart);
-  const end =
-    start < 0
-      ? -1
-      : withoutFence.lastIndexOf(withoutFence[start] === '{' ? '}' : ']');
-
-  const candidates = [
-    trimmed,
-    withoutFence,
-    start >= 0 && end >= start ? withoutFence.slice(start, end + 1) : undefined,
-  ];
-
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    try {
-      return JSON.parse(candidate);
-    } catch {
-      // 尝试下一个候选
-    }
+export const parseCodexThreadId = (line: string): string | undefined => {
+  try {
+    const event = JSON.parse(line) as { type?: string; thread_id?: string };
+    return event.type === 'thread.started' &&
+      typeof event.thread_id === 'string'
+      ? event.thread_id
+      : undefined;
+  } catch {
+    return undefined;
   }
-
-  throw new Error('Final message is not valid JSON.');
 };

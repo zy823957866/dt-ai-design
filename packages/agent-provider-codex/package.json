@@ -26,15 +26,19 @@
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
+    "@dt-ai-design/agent-provider-core": "workspace:*",
     "@dt-ai-design/agent-protocol": "workspace:*",
     "@dt-ai-design/agent-runtime": "workspace:*"
   },
   "devDependencies": {
     "tsdown": "^0.23.0",
     "typescript": "^6.0.3",
-    "@types/node": "^22.20.5"
+    "@types/node": "^22.20.5",
+    "vitest": "^5.0.3"
   }
 }

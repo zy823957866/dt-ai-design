@@ -1,11 +1,17 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 
-import { extractJson, parseCodexJsonlEvent } from '../jsonl';
 import {
-  CodexExecError,
-  type CodexExecRequest,
-  type CodexExecResult,
-} from '../types';
+  AgentExecError,
+  extractJson,
+  readLines,
+  readStream,
+  spawnCli,
+  terminateTree,
+  type AgentExecRequest,
+  type AgentExecResult,
+} from '@dt-ai-design/agent-provider-core';
+
+import { parseCodexJsonlEvent, parseCodexThreadId } from '../jsonl';
 
 export interface CodexProviderOptions {
   /** codex 可执行命令或路径；默认取 CODEX_CLI_PATH 环境变量或 "codex"。 */
@@ -21,8 +27,8 @@ const MAX_STDERR_LENGTH = 16000;
  *
  * 通过 `codex exec --json` 子进程执行一次对话：
  * - prompt 经 stdin 传入（规避 argv 长度上限与转义问题）
- * - stdout JSONL 逐行解析为事件（thread / bash 活动 / 最终消息）
- * - conversation.type === 'resume' 时用 `codex exec resume <threadId>` 延续会话
+ * - stdout JSONL 逐行解析为事件（bash 活动 / 最终消息）
+ * - conversation.type === 'resume' 时用 `codex exec resume <id>` 延续会话
  * - AbortSignal 触发时终止进程（Windows 下 taskkill /T 树杀）
  */
 export class CodexProvider {
@@ -34,21 +40,21 @@ export class CodexProvider {
     this.env = options.env;
   }
 
-  async execute(request: CodexExecRequest): Promise<CodexExecResult> {
+  async execute(request: AgentExecRequest): Promise<AgentExecResult> {
     if (!request.prompt.trim()) {
-      throw new CodexExecError({
+      throw new AgentExecError({
         code: 'spawn-failed',
         message: 'Prompt 不能为空。',
       });
     }
     if (request.signal?.aborted) {
-      throw new CodexExecError({
+      throw new AgentExecError({
         code: 'cancelled',
         message: 'Codex 执行已被取消。',
       });
     }
 
-    const sandbox = request.sandbox ?? 'workspace-write';
+    const sandbox = request.access ?? 'workspace-write';
     const conversation = request.conversation ?? ({ type: 'new' } as const);
 
     const args = ['exec'];
@@ -61,21 +67,14 @@ export class CodexProvider {
       args.push('--sandbox', sandbox);
     }
     if (request.model) args.push('--model', request.model);
-    if (conversation.type === 'resume') args.push(conversation.threadId);
+    if (conversation.type === 'resume') args.push(conversation.id);
     args.push('-'); // prompt 从 stdin 读取
-
-    const { file, argv } = this.resolveSpawnTarget(args);
 
     let child: ChildProcess;
     try {
-      child = spawn(file, argv, {
-        cwd: request.cwd,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: this.env ? { ...process.env, ...this.env } : undefined,
-        windowsHide: true,
-      });
+      child = spawnCli(this.command, args, { cwd: request.cwd, env: this.env });
     } catch (error) {
-      throw new CodexExecError({
+      throw new AgentExecError({
         code: 'spawn-failed',
         message:
           error instanceof Error
@@ -89,21 +88,22 @@ export class CodexProvider {
     child.stdin?.end(request.prompt);
 
     const signal = request.signal;
-    const terminate = () => this.terminate(child);
+    const terminate = () => terminateTree(child);
     signal?.addEventListener('abort', terminate, { once: true });
 
     try {
-      let threadId =
-        conversation.type === 'resume' ? conversation.threadId : undefined;
+      let conversationId =
+        conversation.type === 'resume' ? conversation.id : undefined;
       let finalMessage: string | undefined;
       let usage: Record<string, unknown> | undefined;
       let turnFailure: { code: string; message: string } | undefined;
 
       const handleLine = (line: string) => {
+        const threadId = parseCodexThreadId(line);
+        if (threadId) conversationId = threadId;
         const event = parseCodexJsonlEvent(line);
         if (!event) return;
-        if (event.type === 'thread-started') threadId = event.threadId;
-        else if (event.type === 'message') finalMessage = event.text;
+        if (event.type === 'message') finalMessage = event.text;
         else if (event.type === 'turn-completed') usage = event.usage;
         else if (event.type === 'turn-failed') turnFailure = event.error;
         request.onEvent?.(event);
@@ -118,38 +118,23 @@ export class CodexProvider {
           spawnError = err;
           reject(err);
         });
-        child.once('close', (code, signal) => resolve({ code, signal }));
+        child.once('close', (code, signal2) =>
+          resolve({ code, signal: signal2 }),
+        );
       });
 
       let stderr = '';
-      const stderrDone = (async () => {
-        if (!child.stderr) return;
-        const decoder = new TextDecoder();
-        for await (const chunk of child.stderr) {
-          stderr += decoder.decode(chunk as Buffer, { stream: true });
-          if (stderr.length > MAX_STDERR_LENGTH) {
-            stderr = stderr.slice(-MAX_STDERR_LENGTH);
-          }
-        }
-      })().catch(() => undefined);
+      const stderrDone = readStream(
+        child.stderr,
+        (text) => {
+          stderr += text;
+        },
+        MAX_STDERR_LENGTH,
+      ).catch(() => undefined);
 
-      const stdoutDone = (async () => {
-        if (!child.stdout) return;
-        const decoder = new TextDecoder();
-        let buffer = '';
-        for await (const chunk of child.stdout) {
-          buffer += decoder.decode(chunk as Buffer, { stream: true });
-          let nl = buffer.indexOf('\n');
-          while (nl >= 0) {
-            const line = buffer.slice(0, nl).trim();
-            buffer = buffer.slice(nl + 1);
-            if (line) handleLine(line);
-            nl = buffer.indexOf('\n');
-          }
-        }
-        const tail = (buffer + decoder.decode()).trim();
-        if (tail) handleLine(tail);
-      })().catch(() => undefined);
+      const stdoutDone = readLines(child.stdout, handleLine).catch(
+        () => undefined,
+      );
 
       let exit: { code: number | null; signal: string | null };
       try {
@@ -167,25 +152,25 @@ export class CodexProvider {
       }
 
       if (signal?.aborted) {
-        throw new CodexExecError({
+        throw new AgentExecError({
           code: 'cancelled',
           message: 'Codex 执行已被取消。',
         });
       }
       if (spawnError) {
-        throw new CodexExecError({
+        throw new AgentExecError({
           code: 'spawn-failed',
           message: `无法启动 codex（${this.command}）：${spawnError.message}。请确认已安装 codex CLI（npm i -g @openai/codex）并完成 codex login，或设置 CODEX_CLI_PATH 环境变量。`,
         });
       }
       if (turnFailure) {
-        throw new CodexExecError({
+        throw new AgentExecError({
           code: 'turn-failed',
           message: turnFailure.message,
         });
       }
       if (exit.code !== 0) {
-        throw new CodexExecError({
+        throw new AgentExecError({
           code: 'nonzero-exit',
           message:
             stderr.trim() ||
@@ -194,14 +179,14 @@ export class CodexProvider {
           stderr,
         });
       }
-      if (!threadId) {
-        throw new CodexExecError({
-          code: 'missing-thread-id',
+      if (!conversationId) {
+        throw new AgentExecError({
+          code: 'missing-conversation-id',
           message: 'codex 未输出 thread_id。',
         });
       }
       if (finalMessage === undefined) {
-        throw new CodexExecError({
+        throw new AgentExecError({
           code: 'missing-message',
           message: 'codex 未输出最终消息。',
         });
@@ -212,50 +197,16 @@ export class CodexProvider {
         try {
           json = extractJson(finalMessage);
         } catch {
-          throw new CodexExecError({
+          throw new AgentExecError({
             code: 'invalid-json',
             message: 'codex 最终输出不是合法 JSON。',
           });
         }
       }
 
-      return { threadId, text: finalMessage, json, usage };
+      return { conversationId, text: finalMessage, json, usage };
     } finally {
       signal?.removeEventListener('abort', terminate);
     }
-  }
-
-  /**
-   * Windows 兼容：npm/pnpm 安装的 codex 是 .CMD wrapper（内部再起 node），
-   * Node ≥18.20 禁止直接 spawn .cmd/.bat，需经 cmd.exe 代理；
-   * .exe 可直接 spawn。其余平台直接执行。
-   */
-  private resolveSpawnTarget(args: string[]): {
-    file: string;
-    argv: string[];
-  } {
-    if (process.platform !== 'win32') {
-      return { file: this.command, argv: args };
-    }
-    if (this.command.toLowerCase().endsWith('.exe')) {
-      return { file: this.command, argv: args };
-    }
-    const cmd = process.env.ComSpec ?? 'cmd.exe';
-    return { file: cmd, argv: ['/d', '/c', this.command, ...args] };
-  }
-
-  /** 终止子进程。Windows 下经 cmd.exe 代理时须树杀孙进程。 */
-  private terminate(child: ChildProcess): void {
-    if (child.exitCode !== null || child.signalCode !== null) return;
-    if (process.platform === 'win32' && child.pid !== undefined) {
-      const killer = spawn(
-        'taskkill',
-        ['/pid', String(child.pid), '/T', '/F'],
-        { stdio: 'ignore', windowsHide: true },
-      );
-      killer.on('error', () => child.kill('SIGKILL'));
-      return;
-    }
-    child.kill('SIGTERM');
   }
 }
