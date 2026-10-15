@@ -30,6 +30,9 @@
       "@dt-ai-design/agent-provider-core": [
         "./packages/agent-provider-core/src/index.ts"
       ],
+      "@dt-ai-design/agent-provider-opencode": [
+        "./packages/agent-provider-opencode/src/index.ts"
+      ],
       "@dt-ai-design/canvas-ruler": ["./packages/canvas-ruler/src/index.ts"]
     }
   }
