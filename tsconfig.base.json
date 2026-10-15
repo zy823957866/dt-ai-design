@@ -27,6 +27,9 @@
       "@dt-ai-design/agent-provider-codex": [
         "./packages/agent-provider-codex/src/index.ts"
       ],
+      "@dt-ai-design/agent-provider-core": [
+        "./packages/agent-provider-core/src/index.ts"
+      ],
       "@dt-ai-design/canvas-ruler": ["./packages/canvas-ruler/src/index.ts"]
     }
   }
