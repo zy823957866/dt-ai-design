@@ -17,12 +17,10 @@ export const listOpencodeModels = async (
   const command =
     options.command ?? process.env.OPENCODE_CLI_PATH ?? 'opencode';
   const child = spawnCli(command, ['models']);
-  // 缺少 opencode 时 child 会 emit 'error'；必须挂监听，否则未处理事件会拖垮宿主进程
   let spawnError: Error | undefined;
   child.once('error', (error) => {
     spawnError = error;
   });
-  // 并发排空 stdout/stderr，避免管道写满导致子进程挂起
   const stdoutResult = await Promise.allSettled([
     readStream(child.stdout, () => undefined).catch(() => ''),
     readStream(child.stderr, () => undefined).catch(() => undefined),

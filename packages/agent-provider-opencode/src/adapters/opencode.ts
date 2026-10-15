@@ -114,13 +114,12 @@ export class OpenCodeProvider implements AgentProvider {
       });
 
       let stderr = '';
-      const stderrDone = readStream(
-        child.stderr,
-        (text) => {
-          stderr += text;
-        },
-        MAX_STDERR_LENGTH,
-      ).catch(() => undefined);
+      const stderrDone = readStream(child.stderr, (text) => {
+        stderr += text;
+        if (stderr.length > MAX_STDERR_LENGTH) {
+          stderr = stderr.slice(-MAX_STDERR_LENGTH);
+        }
+      }).catch(() => undefined);
       const stdoutDone = readLines(child.stdout, handleLine).catch(
         () => undefined,
       );
