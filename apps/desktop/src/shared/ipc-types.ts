@@ -5,6 +5,11 @@
  */
 
 import type { DesignDocument } from '@dt-ai-design/design-schema';
+import type {
+  AgentTool,
+  AgentModelInfo,
+} from '@dt-ai-design/agent-provider-core';
+export type { AgentTool, AgentModelInfo };
 
 // ─── 项目 ────────────────────────────────────────────────
 
@@ -37,6 +42,8 @@ export interface AppSettings {
   recentProjects: string[];
   autoSave: boolean;
   autoSaveInterval: number;
+  tool: AgentTool;
+  model: string;
 }
 
 export const IpcSettingsChannel = {
@@ -96,6 +103,7 @@ export interface GenerationStartInput {
   projectId: string;
   prompt: string;
   document: DesignDocument;
+  tool: AgentTool;
   model?: string;
 }
 
@@ -107,6 +115,10 @@ export const IpcGenerationChannel = {
   CANCEL: 'generation:cancel',
   RESET: 'generation:reset',
   EVENT: 'generation:event',
+} as const;
+
+export const IpcAgentChannel = {
+  LIST_MODELS: 'agent:listModels',
 } as const;
 
 // ─── Preload API 类型 ────────────────────────────────────
@@ -138,6 +150,9 @@ export interface DesktopAPI {
   /** 丢弃项目的 AI 会话上下文，下次生成开新会话。 */
   resetGenerationThread: (projectId: string) => Promise<void>;
   onGenerationEvent: (callback: (event: GenerationEvent) => void) => () => void;
+
+  // Agent
+  listModels: (tool: AgentTool) => Promise<AgentModelInfo[]>;
 }
 
 export interface OpenDialogOptions {

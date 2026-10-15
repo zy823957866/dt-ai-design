@@ -223,6 +223,12 @@ importers:
       '@dt-ai-design/agent-provider-codex':
         specifier: workspace:*
         version: link:../../packages/agent-provider-codex
+      '@dt-ai-design/agent-provider-core':
+        specifier: workspace:*
+        version: link:../../packages/agent-provider-core
+      '@dt-ai-design/agent-provider-opencode':
+        specifier: workspace:*
+        version: link:../../packages/agent-provider-opencode
       '@dt-ai-design/agent-runtime':
         specifier: workspace:*
         version: link:../../packages/agent-runtime
