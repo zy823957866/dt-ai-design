@@ -47,9 +47,13 @@ const defaultStroke: StrokeStyle = {
   opacity: 1,
 };
 
-/** 默认 Frame 布局 */
+/** 默认 Frame 布局（pen.dev 单轴模型） */
 const defaultFrameLayout: FrameLayout = {
-  enabled: false,
+  mode: 'none',
+  gap: 0,
+  padding: { top: 0, right: 0, bottom: 0, left: 0 },
+  justifyContent: 'start',
+  alignItems: 'start',
 };
 
 /** 默认图片滤镜 */

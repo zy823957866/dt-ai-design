@@ -90,55 +90,32 @@ export interface EffectStyle {
   opacity?: number;
 }
 
-// ===== Flex Layout =====
+// ===== Frame Layout（pen.dev 单轴模型）=====
 
-export const FlexDirection = {
-  ROW: 'row',
-  ROW_REVERSE: 'rowReverse',
-  COLUMN: 'column',
-  COLUMN_REVERSE: 'columnReverse',
+export const FrameLayoutMode = {
+  NONE: 'none',
+  VERTICAL: 'vertical',
+  HORIZONTAL: 'horizontal',
 } as const;
-export type FlexDirection = (typeof FlexDirection)[keyof typeof FlexDirection];
-
-export const FlexWrap = {
-  NO_WRAP: 'nowrap',
-  WRAP: 'wrap',
-  WRAP_REVERSE: 'wrapReverse',
-} as const;
-export type FlexWrap = (typeof FlexWrap)[keyof typeof FlexWrap];
+export type FrameLayoutMode =
+  (typeof FrameLayoutMode)[keyof typeof FrameLayoutMode];
 
 export const JustifyContent = {
-  FLEX_START: 'flexStart',
+  START: 'start',
   CENTER: 'center',
-  FLEX_END: 'flexEnd',
+  END: 'end',
   SPACE_BETWEEN: 'spaceBetween',
   SPACE_AROUND: 'spaceAround',
-  SPACE_EVENLY: 'spaceEvenly',
 } as const;
 export type JustifyContent =
   (typeof JustifyContent)[keyof typeof JustifyContent];
 
 export const AlignItems = {
-  FLEX_START: 'flexStart',
+  START: 'start',
   CENTER: 'center',
-  FLEX_END: 'flexEnd',
-  STRETCH: 'stretch',
-  BASELINE: 'baseline',
+  END: 'end',
 } as const;
 export type AlignItems = (typeof AlignItems)[keyof typeof AlignItems];
-
-export const AlignContent = {
-  FLEX_START: 'flexStart',
-  CENTER: 'center',
-  FLEX_END: 'flexEnd',
-  SPACE_BETWEEN: 'spaceBetween',
-  SPACE_AROUND: 'spaceAround',
-  STRETCH: 'stretch',
-} as const;
-export type AlignContent = (typeof AlignContent)[keyof typeof AlignContent];
-
-// 兼容别名
-export { AlignItems as FlexAlign };
 
 export interface Padding {
   top: number;
@@ -147,32 +124,12 @@ export interface Padding {
   left: number;
 }
 
-export interface FlexLayout {
-  direction: FlexDirection;
-  wrap: FlexWrap;
+export interface FrameLayout {
+  mode: FrameLayoutMode;
+  gap: number;
+  padding: Padding;
   justifyContent: JustifyContent;
   alignItems: AlignItems;
-  alignContent: AlignContent;
-  gap: number;
-  rowGap?: number;
-  columnGap?: number;
-  padding: Padding;
-}
-
-/**
- * Frame 的布局配置（enabled 标志 + FlexLayout 字段）
- */
-export interface FrameLayout {
-  enabled: boolean;
-  direction?: FlexDirection;
-  wrap?: FlexWrap;
-  justifyContent?: JustifyContent;
-  alignItems?: AlignItems;
-  alignContent?: AlignContent;
-  gap?: number;
-  rowGap?: number;
-  columnGap?: number;
-  padding?: Padding;
 }
 
 // ===== Sizing Mode =====

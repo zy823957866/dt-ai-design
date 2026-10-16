@@ -65,7 +65,7 @@ describe('createLayer', () => {
     const frame = createLayer('frame') as FrameLayer;
     expect(frame.type).toBe('frame');
     expect(frame.children).toEqual([]);
-    expect(frame.layout.enabled).toBe(false);
+    expect(frame.layout.mode).toBe('none');
     expect(frame.overflow).toBe('visible');
   });
 
