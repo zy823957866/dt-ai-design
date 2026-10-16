@@ -10,6 +10,7 @@ import type {
   StickyNoteLayer,
   StrokeStyle,
   EffectStyle,
+  CornerRadius,
   DesignDocument,
 } from '@dt-ai-design/design-schema';
 
@@ -55,6 +56,10 @@ function getFilterUrl(layer: Layer): string {
   const hasShadow = effects.some((e) => e.type === 'dropShadow');
   if (hasShadow) return `url(#${getShadowFilterId(layer.id)})`;
   return '';
+}
+
+function getCornerRadius(value: CornerRadius): number {
+  return typeof value === 'number' ? value : (value?.topLeft ?? 0);
 }
 
 function textAlignToAnchor(
@@ -241,8 +246,8 @@ function FrameLayerNode({
         stroke={stroke?.color || 'transparent'}
         strokeWidth={stroke?.width || 0}
         strokeDasharray={strokeDasharray}
-        rx={layer.cornerRadius || 0}
-        ry={layer.cornerRadius || 0}
+        rx={getCornerRadius(layer.cornerRadius)}
+        ry={getCornerRadius(layer.cornerRadius)}
         opacity={layer.opacity}
         filter={filter || undefined}
       />
@@ -365,8 +370,8 @@ function RectangleLayerNode({
         stroke={stroke?.color || 'transparent'}
         strokeWidth={stroke?.width || 0}
         strokeDasharray={strokeDasharray}
-        rx={layer.cornerRadius || 0}
-        ry={layer.cornerRadius || 0}
+        rx={getCornerRadius(layer.cornerRadius)}
+        ry={getCornerRadius(layer.cornerRadius)}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
         onMouseEnter={onMouseEnter}

@@ -25,7 +25,7 @@ const DOC_SPEC = `## 设计文档 JSON 结构
 id, name, type, x, y, width, height, rotation(0), opacity(0~1), visible(true), locked(false), parentId(顶层为 null), index(同级排序，从 0 起), blendMode("normal")
 
 各类型特有字段：
-- "frame": children: string[], layout: { "enabled": false }（或 { "enabled": true, "direction": "row"|"column", "gap": 8, "padding": {"top":0,"right":0,"bottom":0,"left":0}, "justifyContent": "flexStart"|"center"|"flexEnd"|"spaceBetween", "alignItems": "flexStart"|"center"|"flexEnd"|"stretch" }）, fills, strokes, cornerRadius, effects, overflow("visible"|"hidden"), clipContent(true)
+- "frame": children: string[], layout: { "mode": "none"|"vertical"|"horizontal", "gap": number, "padding": {"top":number,"right":number,"bottom":number,"left":number}, "justifyContent": "start"|"center"|"end"|"spaceBetween"|"spaceAround", "alignItems": "start"|"center"|"end" }, fills, strokes, cornerRadius, effects, overflow("visible"|"hidden"), clipContent(true)
 - "rectangle": fills, strokes, cornerRadius, effects
 - "ellipse": fills, strokes, effects, arcStartAngle(0), arcEndAngle(360), innerRadius(0)
 - "text": content, fontFamily("Inter"), fontWeight(400~700), fontSize, lineHeight, letterSpacing(0), textAlign("left"|"center"|"right"), textDecoration("none"), fills, strokes([]), sizing("autoHeight"), overflow("visible")

@@ -57,7 +57,10 @@ export function nodeToFormValues(layer: Layer): LayerFormValues {
 
   if (layer.type === 'rectangle' || layer.type === 'frame') {
     const rl = layer as RectangleLayer | FrameLayer;
-    base.cornerRadius = rl.cornerRadius || 0;
+    base.cornerRadius =
+      typeof rl.cornerRadius === 'number'
+        ? rl.cornerRadius
+        : (rl.cornerRadius?.topLeft ?? 0);
   }
 
   if (layer.type === 'frame') {
