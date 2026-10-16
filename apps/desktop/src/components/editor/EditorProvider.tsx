@@ -747,38 +747,6 @@ export function EditorProvider({
 
         handleSetActiveTool('move');
       } else if (
-        !isEditingTarget(e.target as HTMLElement) &&
-        !meta &&
-        !e.ctrlKey &&
-        !e.altKey &&
-        e.key.length === 1
-      ) {
-        const key = e.key.toLowerCase();
-
-        const toolMap: Record<string, string> = {
-          v: 'move',
-
-          h: 'hand',
-
-          z: 'zoom',
-
-          r: 'rectangle',
-
-          o: 'ellipse',
-
-          f: 'frame',
-
-          t: 'text',
-
-          n: 'sticky',
-
-          p: 'pen',
-        };
-
-        if (toolMap[key]) {
-          handleSetActiveTool(toolMap[key]);
-        }
-      } else if (
         (e.key === 'Delete' || e.key === 'Backspace') &&
         !isEditingTarget(e.target as HTMLElement)
       ) {
