@@ -5,6 +5,10 @@ export type AgentTool = 'codex' | 'opencode';
 export interface AgentModelInfo {
   id: string;
   label: string;
+  /** 分组名（如 opencode 的 provider 前缀），用于下拉分组展示。 */
+  group?: string;
+  /** 是否为免费模型。 */
+  free?: boolean;
 }
 
 export type AgentAccess = 'read-only' | 'workspace-write' | 'full-access';

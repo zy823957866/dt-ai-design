@@ -38,7 +38,10 @@ import { useEditor } from '@/lib/editor';
 import { useGeneration } from '@/lib/useGeneration';
 import type { ChatTimelineItem } from '@/lib/useGeneration';
 import { useAgentModel, AGENT_TOOLS } from '@/lib/useAgentModel';
-import type { AgentTool } from '@dt-ai-design/agent-provider-core';
+import type {
+  AgentModelInfo,
+  AgentTool,
+} from '@dt-ai-design/agent-provider-core';
 import type { GenerationActivity } from '@/shared/ipc-types';
 
 type LeftTab = 'chat' | 'layers' | 'assets' | 'images';
@@ -238,11 +241,11 @@ function ToolSelector({
     AGENT_TOOLS.find((option) => option.id === tool) ?? AGENT_TOOLS[0];
 
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-[26px] w-full items-center justify-between rounded-[13px] bg-bg-active px-2.5 text-[11px] font-semibold text-text-primary hover:bg-bg-hover"
+        className="flex h-[26px] items-center gap-1.5 rounded-[13px] bg-bg-active px-2.5 text-[11px] font-semibold text-text-primary hover:bg-bg-hover"
       >
         <span>{current.label}</span>
         <ChevronDown className="h-2.5 w-2.5 text-text-muted" />
@@ -251,7 +254,7 @@ function ToolSelector({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-[30px] left-0 z-20 w-full overflow-hidden rounded-lg border border-border bg-bg-popover py-1 shadow-popover">
+          <div className="absolute bottom-[30px] left-0 z-20 min-w-[120px] overflow-hidden rounded-lg border border-border bg-bg-popover py-1 shadow-popover">
             {AGENT_TOOLS.map((option) => (
               <button
                 key={option.id}
@@ -282,7 +285,7 @@ function ModelSelector({
   loading,
   onModelChange,
 }: {
-  models: Array<{ id: string; label: string }>;
+  models: AgentModelInfo[];
   model: string;
   loading: boolean;
   onModelChange: (id: string) => void;
@@ -299,18 +302,26 @@ function ModelSelector({
       )
     : models;
 
+  const groups: Array<{ name: string; items: AgentModelInfo[] }> = [];
+  for (const option of filtered) {
+    const name = option.group ?? '';
+    const group = groups.find((item) => item.name === name);
+    if (group) group.items.push(option);
+    else groups.push({ name, items: [option] });
+  }
+
   const close = () => {
     setOpen(false);
     setQuery('');
   };
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0 flex-1">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         disabled={loading}
-        className="flex h-[26px] w-full items-center justify-between rounded-[13px] bg-bg-active px-2.5 text-[11px] font-semibold text-text-primary hover:bg-bg-hover disabled:opacity-40"
+        className="flex h-[26px] w-full items-center justify-between gap-1.5 rounded-[13px] bg-bg-active px-2.5 text-[11px] font-semibold text-text-primary hover:bg-bg-hover disabled:opacity-40"
       >
         <span className="truncate">
           {current?.label ?? MODEL_FALLBACK_LABEL}
@@ -321,7 +332,7 @@ function ModelSelector({
       {open && models.length > 0 && (
         <>
           <div className="fixed inset-0 z-10" onClick={close} />
-          <div className="absolute bottom-[30px] left-0 z-20 w-full overflow-hidden rounded-lg border border-border bg-bg-popover shadow-popover">
+          <div className="absolute bottom-[30px] left-0 z-20 w-[250px] overflow-hidden rounded-lg border border-border bg-bg-popover shadow-popover">
             <div className="border-b border-border p-1.5">
               <input
                 autoFocus
@@ -337,24 +348,40 @@ function ModelSelector({
                   无匹配模型
                 </div>
               ) : (
-                filtered.map((option) => (
-                  <button
-                    key={option.id}
-                    onClick={() => {
-                      onModelChange(option.id);
-                      close();
-                    }}
-                    className={`flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-[11.5px] hover:bg-bg-hover ${
-                      option.id === model
-                        ? 'bg-accent-soft text-accent-text'
-                        : 'text-text-secondary'
-                    }`}
-                  >
-                    <span className="truncate">{option.label}</span>
-                    {option.id === model && (
-                      <Check className="h-3 w-3 shrink-0" />
+                groups.map((group) => (
+                  <div key={group.name || '__all__'}>
+                    {group.name && (
+                      <div className="px-3 pb-1 pt-2 text-[10px] font-medium tracking-wide text-text-tertiary">
+                        {group.name}
+                      </div>
                     )}
-                  </button>
+                    {group.items.map((option) => (
+                      <button
+                        key={option.id}
+                        onClick={() => {
+                          onModelChange(option.id);
+                          close();
+                        }}
+                        className={`flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-[11.5px] hover:bg-bg-hover ${
+                          option.id === model
+                            ? 'bg-accent-soft text-accent-text'
+                            : 'text-text-secondary'
+                        }`}
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="truncate">{option.label}</span>
+                          {option.free && (
+                            <span className="shrink-0 rounded border border-border px-1 py-px text-[9px] font-normal text-text-muted">
+                              免费
+                            </span>
+                          )}
+                        </span>
+                        {option.id === model && (
+                          <Check className="h-3 w-3 shrink-0" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 ))
               )}
             </div>
@@ -492,51 +519,49 @@ function ChatTab({ projectId }: { projectId?: string }) {
         {modelError && (
           <div className="mt-1 text-[11px] text-red-400">{modelError}</div>
         )}
-        <div className="mt-2.5 flex flex-col gap-2">
-          <ToolSelector tool={tool} onToolChange={setTool} />
-          <ModelSelector
-            models={models}
-            model={model}
-            loading={loading}
-            onModelChange={setModel}
-          />
-          <div className="flex items-center gap-2.5">
-            <CountStepper
-              count={variantCount}
-              onCountChange={setVariantCount}
-            />
-            <div className="flex-1" />
-            {isRunning ? (
-              <button
-                onClick={() => void cancel()}
-                className="flex h-[26px] w-8 items-center justify-center rounded-[13px] bg-red-500 text-white hover:bg-red-600"
-                title="停止生成"
+        <div className="mt-2.5 flex items-center gap-2.5">
+          <CountStepper count={variantCount} onCountChange={setVariantCount} />
+          <div className="flex-1" />
+          {isRunning ? (
+            <button
+              onClick={() => void cancel()}
+              className="flex h-[26px] w-8 items-center justify-center rounded-[13px] bg-red-500 text-white hover:bg-red-600"
+              title="停止生成"
+            >
+              <Square className="h-[10px] w-[10px] fill-current" />
+            </button>
+          ) : (
+            <button
+              onClick={handleSend}
+              disabled={!input.trim()}
+              className="flex h-[26px] w-8 items-center justify-center rounded-[13px] bg-accent text-white disabled:opacity-40"
+              title="发送"
+            >
+              <svg
+                className="h-[11px] w-[11px]"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                <Square className="h-[10px] w-[10px] fill-current" />
-              </button>
-            ) : (
-              <button
-                onClick={handleSend}
-                disabled={!input.trim()}
-                className="flex h-[26px] w-8 items-center justify-center rounded-[13px] bg-accent text-white disabled:opacity-40"
-                title="发送"
-              >
-                <svg
-                  className="h-[11px] w-[11px]"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="12" y1="19" x2="12" y2="5" />
-                  <polyline points="5 12 12 5 19 12" />
-                </svg>
-              </button>
-            )}
-          </div>
+                <line x1="12" y1="19" x2="12" y2="5" />
+                <polyline points="5 12 12 5 19 12" />
+              </svg>
+            </button>
+          )}
         </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <ToolSelector tool={tool} onToolChange={setTool} />
+        <ModelSelector
+          models={models}
+          model={model}
+          loading={loading}
+          onModelChange={setModel}
+        />
       </div>
     </div>
   );

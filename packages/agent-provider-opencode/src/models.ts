@@ -5,12 +5,28 @@ import {
   type AgentModelInfo,
 } from '@dt-ai-design/agent-provider-core';
 
+const prettify = (value: string): string =>
+  value
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .trim();
+
 export const parseOpencodeModels = (stdout: string): AgentModelInfo[] =>
   stdout
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.includes('/') && !line.includes(' '))
-    .map((line) => ({ id: line, label: line }));
+    .map((line) => {
+      const slash = line.indexOf('/');
+      const group = line.slice(0, slash);
+      const name = line.slice(slash + 1);
+      return {
+        id: line,
+        label: prettify(name),
+        group,
+        free: /free/i.test(line),
+      };
+    });
 
 export const listOpencodeModels = async (
   options: { command?: string } = {},

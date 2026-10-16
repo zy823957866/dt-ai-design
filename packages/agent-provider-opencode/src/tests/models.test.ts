@@ -2,20 +2,27 @@ import { describe, expect, it } from 'vitest';
 import { listOpencodeModels, parseOpencodeModels } from '../models';
 
 describe('parseOpencodeModels', () => {
-  it('parses provider/model lines', () => {
+  it('parses provider/model lines with group, pretty label and free flag', () => {
     const out = 'deepseek/deepseek-flash\nopencode/deepseek-v4.1-flash-free\n';
     expect(parseOpencodeModels(out)).toEqual([
-      { id: 'deepseek/deepseek-flash', label: 'deepseek/deepseek-flash' },
+      {
+        id: 'deepseek/deepseek-flash',
+        label: 'Deepseek Flash',
+        group: 'deepseek',
+        free: false,
+      },
       {
         id: 'opencode/deepseek-v4.1-flash-free',
-        label: 'opencode/deepseek-v4.1-flash-free',
+        label: 'Deepseek V4.1 Flash Free',
+        group: 'opencode',
+        free: true,
       },
     ]);
   });
 
   it('trims blanks and ignores malformed lines', () => {
     expect(parseOpencodeModels('\n  a/b  \nno-slash\n')).toEqual([
-      { id: 'a/b', label: 'a/b' },
+      { id: 'a/b', label: 'B', group: 'a', free: false },
     ]);
   });
 });
