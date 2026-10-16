@@ -17,6 +17,9 @@
     "paths": {
       "@dt-ai-design/design-schema": ["./packages/design-schema/src/index.ts"],
       "@dt-ai-design/editor-core": ["./packages/editor-core/src/index.ts"],
+      "@dt-ai-design/editor-interaction": [
+        "./packages/editor-interaction/src/index.ts"
+      ],
       "@dt-ai-design/agent-protocol": [
         "./packages/agent-protocol/src/index.ts"
       ],
