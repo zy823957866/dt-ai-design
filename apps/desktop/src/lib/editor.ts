@@ -45,6 +45,24 @@ export interface EditorApi {
   moveLayerToFront: (layerId: string) => void;
   moveLayerToBack: (layerId: string) => void;
 
+  // ─── 样式数组（fills/strokes/effects）───
+  appendStyleItem: (
+    layerId: string,
+    field: 'fills' | 'strokes' | 'effects',
+    item: unknown,
+  ) => void;
+  updateStyleItem: (
+    layerId: string,
+    field: 'fills' | 'strokes' | 'effects',
+    index: number,
+    patch: unknown,
+  ) => void;
+  removeStyleItem: (
+    layerId: string,
+    field: 'fills' | 'strokes' | 'effects',
+    index: number,
+  ) => void;
+
   // ─── 选择 ───
   setSelection: (layerIds: string[]) => void;
   selectAll: () => void;

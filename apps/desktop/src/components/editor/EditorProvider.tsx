@@ -28,6 +28,15 @@ import {
   ungroupSelection,
   frameSelection,
   duplicateLayer,
+  appendFill,
+  updateFill,
+  removeFill,
+  appendStroke,
+  updateStroke,
+  removeStroke,
+  appendEffect,
+  updateEffect,
+  removeEffect,
   replaceDocument as replaceDocumentFn,
   zoomIn as zoomInFn,
   zoomOut as zoomOutFn,
@@ -314,6 +323,88 @@ export function EditorProvider({
       notifyChange();
     },
 
+    [notifyChange],
+  );
+
+  const handleAppendStyleItem = useCallback(
+    (
+      layerId: string,
+      field: 'fills' | 'strokes' | 'effects',
+      item: unknown,
+    ) => {
+      const prevDoc = stateRef.current.document;
+      const run =
+        field === 'fills'
+          ? appendFill
+          : field === 'strokes'
+            ? appendStroke
+            : appendEffect;
+      const cmd = {
+        name: `appendStyleItem:${field}`,
+        execute: (s: EditorState) => run(s, layerId, item as never),
+        undo: (s: EditorState) => {
+          s.document = prevDoc;
+          return s.document;
+        },
+      };
+      stackRef.current.execute(cmd);
+      notifyChange();
+    },
+    [notifyChange],
+  );
+
+  const handleUpdateStyleItem = useCallback(
+    (
+      layerId: string,
+      field: 'fills' | 'strokes' | 'effects',
+      index: number,
+      patch: unknown,
+    ) => {
+      const prevDoc = stateRef.current.document;
+      const run =
+        field === 'fills'
+          ? updateFill
+          : field === 'strokes'
+            ? updateStroke
+            : updateEffect;
+      const cmd = {
+        name: `updateStyleItem:${field}`,
+        execute: (s: EditorState) => run(s, layerId, index, patch as never),
+        undo: (s: EditorState) => {
+          s.document = prevDoc;
+          return s.document;
+        },
+      };
+      stackRef.current.execute(cmd);
+      notifyChange();
+    },
+    [notifyChange],
+  );
+
+  const handleRemoveStyleItem = useCallback(
+    (
+      layerId: string,
+      field: 'fills' | 'strokes' | 'effects',
+      index: number,
+    ) => {
+      const prevDoc = stateRef.current.document;
+      const run =
+        field === 'fills'
+          ? removeFill
+          : field === 'strokes'
+            ? removeStroke
+            : removeEffect;
+      const cmd = {
+        name: `removeStyleItem:${field}`,
+        execute: (s: EditorState) => run(s, layerId, index),
+        undo: (s: EditorState) => {
+          s.document = prevDoc;
+          return s.document;
+        },
+      };
+      stackRef.current.execute(cmd);
+      notifyChange();
+    },
     [notifyChange],
   );
 
@@ -828,6 +919,12 @@ export function EditorProvider({
     moveLayerToFront: handleMoveLayerToFront,
 
     moveLayerToBack: handleMoveLayerToBack,
+
+    appendStyleItem: handleAppendStyleItem,
+
+    updateStyleItem: handleUpdateStyleItem,
+
+    removeStyleItem: handleRemoveStyleItem,
 
     setSelection: handleSetSelection,
 
