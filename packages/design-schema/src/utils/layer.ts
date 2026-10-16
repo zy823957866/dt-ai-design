@@ -38,7 +38,7 @@ export type LayerTypeString =
 /** 默认填充 */
 const defaultFill: FillStyle = {
   type: 'solid',
-  color: '#7C3AED',
+  color: '#CCCCCC',
   opacity: 1,
 };
 
