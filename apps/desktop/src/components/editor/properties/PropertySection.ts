@@ -7,6 +7,7 @@ export interface PropertyContextValue {
   layer: Layer | null;
   layers: Layer[];
   isMulti: boolean;
+  onExport?: () => void;
 }
 
 export interface PropertySection {

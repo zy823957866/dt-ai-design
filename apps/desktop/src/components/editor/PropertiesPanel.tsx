@@ -10,12 +10,14 @@ interface PropertiesPanelProps {
   onCollapse: () => void;
   onExpand: () => void;
   onOpenColor?: () => void;
+  onExport?: () => void;
 }
 
 export function PropertiesPanel({
   collapsed,
   onCollapse,
   onExpand,
+  onExport,
 }: PropertiesPanelProps) {
   const editor = useEditor();
   const [, forceUpdate] = useState(0);
@@ -55,6 +57,7 @@ export function PropertiesPanel({
     layers,
     layer: layers.length === 1 ? layers[0] : null,
     isMulti: layers.length > 1,
+    onExport,
   };
 
   return (
