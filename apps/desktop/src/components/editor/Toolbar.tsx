@@ -107,29 +107,18 @@ function FlyoutGroup({
 }) {
   const pinned = group.tools.slice(0, group.pinned ?? 1);
   const rest = group.tools.slice(group.pinned ?? 1);
-  const primary = pinned.find((t) => t.id === activeTool) ?? pinned[0];
-  const Icon = primary.icon;
 
   return (
     <div className="flex items-center gap-[2px]">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            onClick={() => onSelect(primary.id)}
-            className={`flex h-[27px] flex-1 items-center justify-center rounded-md transition-colors ${
-              activeTool === primary.id
-                ? 'bg-accent-soft text-accent-text'
-                : 'text-text-secondary hover:bg-bg-hover'
-            }`}
-          >
-            <Icon className="h-3.5 w-3.5" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="right" sideOffset={8}>
-          {primary.label} · {primary.shortcut}
-        </TooltipContent>
-      </Tooltip>
+      {pinned.map((tool) => (
+        <div key={tool.id} className="flex-1">
+          <ToolButton
+            tool={tool}
+            active={activeTool === tool.id}
+            onSelect={() => tool.enabled && onSelect(tool.id)}
+          />
+        </div>
+      ))}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
