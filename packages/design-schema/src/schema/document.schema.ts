@@ -47,6 +47,7 @@ export const documentSchema = z.object({
 export function validateDocument(doc: unknown): {
   success: boolean;
   errors: string[];
+  data?: DesignDocument;
 } {
   const result = documentSchema.safeParse(normalizeDocument(doc));
   if (!result.success) {
@@ -90,5 +91,9 @@ export function validateDocument(doc: unknown): {
     }
   }
 
-  return { success: errors.length === 0, errors };
+  return {
+    success: errors.length === 0,
+    errors,
+    data: errors.length === 0 ? parsed : undefined,
+  };
 }

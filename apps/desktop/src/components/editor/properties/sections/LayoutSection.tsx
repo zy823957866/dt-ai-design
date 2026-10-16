@@ -17,6 +17,7 @@ function LayoutPanel({ ctx }: { ctx: PropertyContextValue }) {
   const frame = layer as FrameLayer;
   const layout = frame.layout;
   const padding = layout.padding ?? { top: 0, right: 0, bottom: 0, left: 0 };
+  const sizing = frame.sizingMode ?? { width: 'fixed', height: 'fixed' };
   const set = (patch: Partial<FrameLayout>) =>
     editor.setLayerProperty(frame.id, 'layout', { ...layout, ...patch });
   const setPadding = (key: keyof FrameLayout['padding'], v: number) =>
@@ -78,10 +79,10 @@ function LayoutPanel({ ctx }: { ctx: PropertyContextValue }) {
             <CheckboxField
               id="fill-width"
               label="Fill Width"
-              checked={frame.sizingMode.width === 'fillContainer'}
+              checked={sizing.width === 'fillContainer'}
               onChange={(v) =>
                 editor.setLayerProperty(frame.id, 'sizingMode', {
-                  ...frame.sizingMode,
+                  ...sizing,
                   width: v ? 'fillContainer' : 'fixed',
                 })
               }
@@ -89,10 +90,10 @@ function LayoutPanel({ ctx }: { ctx: PropertyContextValue }) {
             <CheckboxField
               id="hug-width"
               label="Hug Width"
-              checked={frame.sizingMode.width === 'hugContents'}
+              checked={sizing.width === 'hugContents'}
               onChange={(v) =>
                 editor.setLayerProperty(frame.id, 'sizingMode', {
-                  ...frame.sizingMode,
+                  ...sizing,
                   width: v ? 'hugContents' : 'fixed',
                 })
               }

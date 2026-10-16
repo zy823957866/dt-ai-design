@@ -12,6 +12,7 @@ import {
   textSizingSchema,
   imageFitModeSchema,
   imageFiltersSchema,
+  sizingModeSchema,
 } from './styles.schema';
 
 // Rectangle
@@ -74,6 +75,12 @@ export const frameLayerSchema = baseLayerSchema.extend({
   type: z.literal('frame'),
   children: z.array(z.string()),
   layout: frameLayoutSchema,
+  sizingMode: z
+    .object({
+      width: sizingModeSchema.default('fixed'),
+      height: sizingModeSchema.default('fixed'),
+    })
+    .default({ width: 'fixed', height: 'fixed' }),
   overflow: overflowModeSchema,
   fills: z.array(fillStyleSchema),
   strokes: z.array(strokeStyleSchema),

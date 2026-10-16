@@ -157,7 +157,7 @@ export class Orchestrator {
       run.setStage('validating', '正在校验生成结果');
       const verdict = this.validator.validate(candidate);
       if (verdict.valid) {
-        return { document: candidate, conversationId };
+        return { document: verdict.document ?? candidate, conversationId };
       }
 
       lastErrors = verdict.errors;

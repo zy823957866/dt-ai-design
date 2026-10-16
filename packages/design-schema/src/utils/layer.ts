@@ -221,6 +221,7 @@ export function createLayer(
         ...base,
         children: [],
         layout: { ...defaultFrameLayout },
+        sizingMode: { width: 'fixed', height: 'fixed' },
         fills: [{ type: 'solid' as const, color: '#FFFFFF', opacity: 1 }],
         strokes: [],
         cornerRadius: 0,
