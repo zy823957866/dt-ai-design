@@ -63,6 +63,7 @@ export default function EditorPage() {
         <div className="flex h-screen w-full flex-col overflow-hidden bg-bg-canvas text-text-primary">
           <EditorTitleBar
             projectName={documentName}
+            fileId={fileId}
             onBack={() => navigate('/dashboard')}
             onExport={() => setOverlay('export')}
             onOpenSettings={() => setOverlay('settings')}
@@ -103,17 +104,34 @@ export default function EditorPage() {
 
 function EditorTitleBar({
   projectName,
+  fileId,
   onBack,
   onExport,
   onOpenSettings,
 }: {
   projectName: string;
+  fileId: string;
   onBack: () => void;
   onExport: () => void;
   onOpenSettings: () => void;
 }) {
   const editor = useEditor();
   const [, forceUpdate] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const doc = editor.getDocument();
+      if (fileId !== 'new') {
+        await window.desktopAPI.saveProject(fileId, doc);
+      }
+    } catch (err) {
+      console.error('Save failed:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   useEffect(() => {
     const off = editor.subscribe('viewportChange', () =>
@@ -130,6 +148,8 @@ function EditorTitleBar({
       onLogoClick={onBack}
       onExport={onExport}
       onOpenSettings={onOpenSettings}
+      onSave={handleSave}
+      isSaving={isSaving}
     />
   );
 }

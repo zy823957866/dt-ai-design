@@ -88,6 +88,7 @@ export function Canvas() {
 
   const activeTool = interactionState.activeTool;
   const interactionMode = interactionState.mode;
+  const isSpacePressed = interactionState.isSpacePressed;
   const creationBounds = interactionState.creationBounds;
   const marqueeBounds = interactionState.marqueeBounds;
 
@@ -337,19 +338,9 @@ export function Canvas() {
           case 'endPan':
             break;
           case 'pan':
-            editor.pan(cmd.dx * viewport.zoom, cmd.dy * viewport.zoom);
+            // dx/dy 已是屏幕像素增量，与 handleMouseMove 的平移拦截路径一致
+            editor.pan(cmd.dx, cmd.dy);
             break;
-          case 'createLayer': {
-            const w = Math.max(cmd.bounds.width, 1);
-            const h = Math.max(cmd.bounds.height, 1);
-            editor.addLayer(cmd.layerType, {
-              x: cmd.bounds.x,
-              y: cmd.bounds.y,
-              width: w,
-              height: h,
-            });
-            break;
-          }
           case 'moveLayer': {
             for (const id of cmd.layerIds) {
               const layer = doc.layers[id];
@@ -442,7 +433,7 @@ export function Canvas() {
         }
       }
     },
-    [editor, doc, viewport.zoom, computeSmartGuides],
+    [editor, doc, computeSmartGuides],
   );
   // ─── Pointer event handlers (delegated to interaction state machine) ───
   const handleMouseDown = useCallback(
@@ -495,8 +486,18 @@ export function Canvas() {
 
       const hit = hitTestAtPoint(canvasPos.x, canvasPos.y);
 
+      // 手型工具 / 空格拖拽会进入平移模式：平移全程使用屏幕坐标（与 pointerMove 的
+      // panning 分支一致），若此处传世界坐标，首次移动会算出 clientX - worldX 的巨
+      // 大增量，导致画布内容瞬间飞向右下角
+      const willPan = activeTool === 'hand' || isSpacePressed;
+
       // Save initial positions for move/smart guides
-      if (activeTool === 'select' && hit.type === 'layer' && !e.shiftKey) {
+      if (
+        activeTool === 'select' &&
+        hit.type === 'layer' &&
+        !e.shiftKey &&
+        !willPan
+      ) {
         const alreadySelected = selection.layerIds.includes(hit.layerId);
         const selIds = alreadySelected ? selection.layerIds : [hit.layerId];
         initialDragPositionsRef.current = new Map();
@@ -504,13 +505,13 @@ export function Canvas() {
           const l = doc.layers[id];
           if (l) initialDragPositionsRef.current.set(id, { x: l.x, y: l.y });
         }
-      } else if (activeTool === 'select' && hit.type === 'empty') {
+      } else if (activeTool === 'select' && hit.type === 'empty' && !willPan) {
         marqueeInitialRef.current = e.shiftKey ? [...selection.layerIds] : [];
       }
 
       const commands = interactionDispatch({
         type: 'pointerDown',
-        point: canvasPos,
+        point: willPan ? { x: e.clientX, y: e.clientY } : canvasPos,
         hit,
         shiftKey: e.shiftKey,
         metaKey: e.metaKey || e.ctrlKey,
@@ -522,6 +523,7 @@ export function Canvas() {
       editor,
       viewport,
       activeTool,
+      isSpacePressed,
       selection.layerIds,
       screenToCanvas,
       hitTestAtPoint,
@@ -653,6 +655,64 @@ export function Canvas() {
       textareaRef.current.select();
     }
   }, [editingTextId]);
+
+  // 键盘：Ctrl+= / Ctrl+- / Ctrl+0 控制画布缩放（应用菜单已移除 zoom role）
+  const zoomAtCenter = useCallback(
+    (factor: number) => {
+      const rect = svgRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const newZoom = Math.min(Math.max(viewport.zoom * (1 + factor), 0.1), 16);
+      if (newZoom === viewport.zoom) return;
+      const zoomRatio = newZoom / viewport.zoom;
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+      editor.setViewport({
+        zoom: newZoom,
+        panX: cx - (cx - viewport.panX) * zoomRatio,
+        panY: cy - (cy - viewport.panY) * zoomRatio,
+      });
+    },
+    [editor, viewport],
+  );
+
+  const resetZoomAtCenter = useCallback(() => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    editor.setViewport({
+      zoom: 1,
+      panX: cx - (cx - viewport.panX) / viewport.zoom,
+      panY: cy - (cy - viewport.panY) / viewport.zoom,
+    });
+  }, [editor, viewport]);
+
+  useEffect(() => {
+    const handleZoomKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      const key = e.key;
+      if (key === '=' || key === '+') {
+        e.preventDefault();
+        zoomAtCenter(0.1);
+      } else if (key === '-' || key === '_') {
+        e.preventDefault();
+        zoomAtCenter(-0.1);
+      } else if (key === '0') {
+        e.preventDefault();
+        resetZoomAtCenter();
+      }
+    };
+    window.addEventListener('keydown', handleZoomKeyDown);
+    return () => window.removeEventListener('keydown', handleZoomKeyDown);
+  }, [zoomAtCenter, resetZoomAtCenter]);
 
   // Keyboard: space bar for panning
   useEffect(() => {

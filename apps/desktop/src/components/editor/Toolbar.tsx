@@ -11,6 +11,11 @@
   ZoomIn,
 } from 'lucide-react';
 import { useEditorInteraction } from './EditorInteractionProvider';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface ToolItem {
   id: string;
@@ -40,7 +45,7 @@ export function Toolbar() {
   };
 
   return (
-    <div className="absolute left-[34px] top-7 z-30 flex h-[309px] w-[109px] flex-col gap-[2px] rounded-xl border border-border bg-bg-panel p-1.5 shadow-popover">
+    <div className="absolute left-[34px] top-7 z-30 flex w-[38px] flex-col gap-[2px] rounded-xl border border-border bg-bg-panel p-1.5 shadow-popover">
       {tools.map((tool, i) => {
         const Icon = tool.icon;
         const selected = activeTool === tool.id;
@@ -49,20 +54,26 @@ export function Toolbar() {
             {i === 3 && (
               <div className="mx-auto my-0.5 h-px w-[22px] bg-border" />
             )}
-            <button
-              type="button"
-              onClick={() => handleTool(tool)}
-              className={`flex h-[27px] items-center gap-1.5 rounded-md pl-2.5 pr-2 text-xs transition-colors ${
-                selected
-                  ? 'bg-accent-soft text-accent-text'
-                  : 'text-text-secondary hover:bg-bg-hover'
-              }`}
-            >
-              <Icon
-                className={`h-3.5 w-3.5 ${selected ? 'text-accent-strong' : ''}`}
-              />
-              {tool.label}
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => handleTool(tool)}
+                  className={`flex h-[27px] w-full items-center justify-center rounded-md transition-colors ${
+                    selected
+                      ? 'bg-accent-soft text-accent-text'
+                      : 'text-text-secondary hover:bg-bg-hover'
+                  }`}
+                >
+                  <Icon
+                    className={`h-3.5 w-3.5 ${selected ? 'text-accent-strong' : ''}`}
+                  />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8}>
+                {tool.label}
+              </TooltipContent>
+            </Tooltip>
           </div>
         );
       })}

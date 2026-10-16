@@ -216,7 +216,7 @@ export function createLayer(
         ...base,
         children: [],
         layout: { ...defaultFrameLayout },
-        fills: [{ type: 'solid' as const, color: '#1E1E24', opacity: 1 }],
+        fills: [{ type: 'solid' as const, color: '#FFFFFF', opacity: 1 }],
         strokes: [],
         cornerRadius: 0,
         effects: [],
