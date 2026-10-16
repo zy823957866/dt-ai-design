@@ -210,7 +210,7 @@ export function createLayer(
     case 'polygon':
       return {
         ...base,
-        fills: [{ ...defaultFill }],
+        fills: [{ ...defaultShapeFill }],
         strokes: [],
         effects: [],
         cornerRadius: 0,
