@@ -82,7 +82,7 @@ export function EditorProvider({
 
   const eventsRef = useRef(createEventEmitter());
 
-  const activeToolRef = useRef<string>('select');
+  const activeToolRef = useRef<string>('move');
 
   const showRulersRef = useRef(true);
 
@@ -745,7 +745,7 @@ export function EditorProvider({
       } else if (e.key === 'Escape') {
         handleDeselectAll();
 
-        handleSetActiveTool('select');
+        handleSetActiveTool('move');
       } else if (
         !isEditingTarget(e.target as HTMLElement) &&
         !meta &&
@@ -756,7 +756,7 @@ export function EditorProvider({
         const key = e.key.toLowerCase();
 
         const toolMap: Record<string, string> = {
-          v: 'select',
+          v: 'move',
 
           h: 'hand',
 

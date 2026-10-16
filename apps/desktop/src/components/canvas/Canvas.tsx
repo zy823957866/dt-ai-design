@@ -493,7 +493,7 @@ export function Canvas() {
 
       // Save initial positions for move/smart guides
       if (
-        activeTool === 'select' &&
+        activeTool === 'move' &&
         hit.type === 'layer' &&
         !e.shiftKey &&
         !willPan
@@ -505,7 +505,7 @@ export function Canvas() {
           const l = doc.layers[id];
           if (l) initialDragPositionsRef.current.set(id, { x: l.x, y: l.y });
         }
-      } else if (activeTool === 'select' && hit.type === 'empty' && !willPan) {
+      } else if (activeTool === 'move' && hit.type === 'empty' && !willPan) {
         marqueeInitialRef.current = e.shiftKey ? [...selection.layerIds] : [];
       }
 
@@ -609,7 +609,7 @@ export function Canvas() {
   const handleResizeStart = useCallback(
     (e: React.MouseEvent, handle: string, layerId: string) => {
       e.stopPropagation();
-      if (activeTool !== 'select') return;
+      if (activeTool !== 'move') return;
       const layer = doc.layers[layerId];
       if (!layer) return;
       const canvasPos = screenToCanvas(e.clientX, e.clientY);
@@ -762,7 +762,7 @@ export function Canvas() {
     if (interactionMode === 'panning') return 'grabbing';
     if (activeTool === 'hand' || interactionState.isSpacePressed) return 'grab';
     if (activeTool === 'zoom') return 'zoom-in';
-    if (['rectangle', 'ellipse', 'frame', 'triangle'].includes(activeTool))
+    if (['rectangle', 'ellipse', 'frame'].includes(activeTool))
       return 'crosshair';
     return 'default';
   };
@@ -992,7 +992,7 @@ export function Canvas() {
         panY={viewport.panY + canvasOffset}
         zoom={viewport.zoom}
         showHandles={
-          activeTool === 'select' &&
+          activeTool === 'move' &&
           selection.layerIds.length === 1 &&
           interactionMode === 'idle'
         }
