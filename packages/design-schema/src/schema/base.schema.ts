@@ -59,7 +59,7 @@ export const baseLayerSchema = z.object({
   parentId: z.string().nullable(),
   index: z.number().int().min(0),
   blendMode: blendModeSchema,
-  layerPosition: layerPositionSchema,
+  layerPosition: layerPositionSchema.default('auto'),
   metadata: layerMetadataSchema.optional(),
 });
 

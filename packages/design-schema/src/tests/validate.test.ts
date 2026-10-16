@@ -127,4 +127,24 @@ describe('validateDocument', () => {
     const result = validateDocument(doc);
     expect(result.success).toBe(true);
   });
+
+  it('validates legacy frame layout and layers missing layerPosition', () => {
+    const doc = createDocument();
+    const frame = createLayer('frame') as FrameLayer;
+    const rect = createLayer('rectangle') as RectangleLayer;
+
+    frame.children = [rect.id];
+    const rawFrame = frame as unknown as Record<string, unknown>;
+    rawFrame.layout = { enabled: false };
+    delete rawFrame.layerPosition;
+    delete (rect as unknown as Record<string, unknown>).layerPosition;
+
+    doc.layers[frame.id] = frame;
+    doc.layers[rect.id] = rect;
+    doc.rootLayerIds = [frame.id];
+
+    const result = validateDocument(doc);
+    expect(result.success).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
 });

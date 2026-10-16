@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeFrameLayout } from '../utils/migrate';
+import { normalizeDocument, normalizeFrameLayout } from '../utils/migrate';
+import type { FrameLayout } from '../types';
 
 describe('normalizeFrameLayout', () => {
   it('maps legacy disabled layout to mode none', () => {
@@ -28,5 +29,26 @@ describe('normalizeFrameLayout', () => {
     });
     expect(next.mode).toBe('vertical');
     expect(next.padding).toEqual({ top: 1, right: 2, bottom: 3, left: 4 });
+  });
+});
+
+describe('normalizeDocument', () => {
+  it('normalizes a legacy frame layout without mutating the input', () => {
+    const doc = {
+      layers: {
+        f1: {
+          type: 'frame',
+          layout: { enabled: true, direction: 'row', gap: 12 },
+        },
+        r1: { type: 'rectangle' },
+      },
+    };
+
+    const next = normalizeDocument(doc);
+    const layout = next.layers.f1.layout as unknown as FrameLayout;
+
+    expect(layout.mode).toBe('horizontal');
+    expect(layout.gap).toBe(12);
+    expect((doc.layers.f1.layout as { enabled?: boolean }).enabled).toBe(true);
   });
 });

@@ -22,7 +22,8 @@ const DOC_SPEC = `## 设计文档 JSON 结构
 所有图层扁平存储在 layers 中，父子关系通过 frame/group 的 children: string[] 引用。
 
 图层通用字段（每个图层必填）：
-id, name, type, x, y, width, height, rotation(0), opacity(0~1), visible(true), locked(false), parentId(顶层为 null), index(同级排序，从 0 起), blendMode("normal")
+id, name, type, x, y, width, height, rotation(0), opacity(0~1), visible(true), locked(false), parentId(顶层为 null), index(同级排序，从 0 起), blendMode("normal"), layerPosition("auto")
+（metadata 字段可选，不需要输出。）
 
 各类型特有字段：
 - "frame": children: string[], layout: { "mode": "none"|"vertical"|"horizontal", "gap": number, "padding": {"top":number,"right":number,"bottom":number,"left":number}, "justifyContent": "start"|"center"|"end"|"spaceBetween"|"spaceAround", "alignItems": "start"|"center"|"end" }, fills, strokes, cornerRadius, effects, overflow("visible"|"hidden"), clipContent(true)

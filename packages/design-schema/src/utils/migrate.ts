@@ -30,3 +30,18 @@ export function normalizeFrameLayout(raw: unknown): FrameLayout {
     alignItems: (r.alignItems as FrameLayout['alignItems']) ?? 'start',
   };
 }
+
+/** 归一化整篇文档中的 frame layout（兼容旧结构） */
+export function normalizeDocument<T>(doc: T): T {
+  const next = JSON.parse(JSON.stringify(doc)) as {
+    layers?: Record<string, { type?: string; layout?: unknown }>;
+  };
+  if (next.layers) {
+    for (const layer of Object.values(next.layers)) {
+      if (layer && layer.type === 'frame' && layer.layout != null) {
+        layer.layout = normalizeFrameLayout(layer.layout);
+      }
+    }
+  }
+  return next as T;
+}

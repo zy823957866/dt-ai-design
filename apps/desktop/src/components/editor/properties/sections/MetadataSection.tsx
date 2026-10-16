@@ -35,16 +35,19 @@ function MetadataPanel({ ctx }: { ctx: PropertyContextValue }) {
     <>
       <SectionHeader label="Metadata" />
       <TextRow
+        key={`${layer.id}-source`}
         label="Source"
         value={metadata.sourceUrl ?? ''}
         onCommit={(v) => set('sourceUrl', v)}
       />
       <TextRow
+        key={`${layer.id}-tag`}
         label="Tag"
         value={metadata.htmlId ?? ''}
         onCommit={(v) => set('htmlId', v)}
       />
       <TextRow
+        key={`${layer.id}-link`}
         label="Link"
         value={metadata.link ?? ''}
         onCommit={(v) => set('link', v)}

@@ -39,6 +39,8 @@ export const effectTypeSchema = z.enum([
   'dropShadow',
   'innerShadow',
   'blur',
+  'layerBlur',
+  'backgroundBlur',
   'outerGlow',
   'innerGlow',
   'shader',
