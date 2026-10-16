@@ -652,7 +652,7 @@ function TextLayerNode({
         onMouseLeave={onMouseLeave}
         filter={filter || undefined}
       >
-        {layer.content || 'Text'}
+        {layer.content || ''}
       </text>
     </g>
   );

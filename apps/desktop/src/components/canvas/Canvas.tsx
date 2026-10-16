@@ -499,13 +499,14 @@ export function Canvas() {
 
       if (e.button !== 0) return;
 
-      // 文字工具：点击创建文字图层并进入内联编辑
+      // 文字工具：点击创建空的文字图层并进入内联编辑
       if (activeTool === 'text') {
         editor.addLayer('text', {
           x: canvasPos.x,
           y: canvasPos.y,
           width: 160,
           height: 24,
+          content: '',
         });
         const newId = editor.getSelection().layerIds[0];
         if (newId) setEditingTextId(newId);

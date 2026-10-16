@@ -31,6 +31,13 @@ function TypographyPanel({ ctx }: { ctx: PropertyContextValue }) {
   return (
     <>
       <SectionHeader label="Typography" />
+      <textarea
+        value={t.content}
+        onChange={(e) => set('content', e.target.value)}
+        rows={2}
+        placeholder="Text"
+        className="mb-2 w-full resize-none rounded-md border border-border bg-bg-input px-2 py-1.5 text-xs text-text-primary outline-none focus:border-accent"
+      />
       <div className="grid grid-cols-2 gap-2">
         <NumberField
           label="Size"
