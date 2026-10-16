@@ -25,6 +25,17 @@ describe('parseOpencodeModels', () => {
       { id: 'a/b', label: 'B', group: 'a', free: false },
     ]);
   });
+
+  it('marks every opencode/ model free even without a free suffix', () => {
+    expect(parseOpencodeModels('opencode/big-pickle')).toEqual([
+      {
+        id: 'opencode/big-pickle',
+        label: 'Big Pickle',
+        group: 'opencode',
+        free: true,
+      },
+    ]);
+  });
 });
 
 describe('listOpencodeModels', () => {

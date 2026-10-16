@@ -24,7 +24,7 @@ export const parseOpencodeModels = (stdout: string): AgentModelInfo[] =>
         id: line,
         label: prettify(name),
         group,
-        free: /free/i.test(line),
+        free: group === 'opencode' || /free/i.test(line),
       };
     });
 
