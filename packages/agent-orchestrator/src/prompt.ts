@@ -1,4 +1,7 @@
-import type { DesignDocument } from '@dt-ai-design/design-schema';
+import {
+  normalizeDocument,
+  type DesignDocument,
+} from '@dt-ai-design/design-schema';
 
 /**
  * 文档生成 prompt 模板。
@@ -98,7 +101,7 @@ export const assembleDocument = (
     throw new Error('codex 输出缺少 layers / rootLayerIds 字段。');
   }
 
-  return {
+  return normalizeDocument({
     ...(g as DesignDocument),
     id: base.id,
     name: base.name,
@@ -111,5 +114,5 @@ export const assembleDocument = (
       createdAt: base.meta?.createdAt ?? Date.now(),
       updatedAt: Date.now(),
     },
-  };
+  });
 };

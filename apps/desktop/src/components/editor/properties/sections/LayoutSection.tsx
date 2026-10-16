@@ -16,10 +16,11 @@ function LayoutPanel({ ctx }: { ctx: PropertyContextValue }) {
   if (!layer || layer.type !== 'frame') return null;
   const frame = layer as FrameLayer;
   const layout = frame.layout;
+  const padding = layout.padding ?? { top: 0, right: 0, bottom: 0, left: 0 };
   const set = (patch: Partial<FrameLayout>) =>
     editor.setLayerProperty(frame.id, 'layout', { ...layout, ...patch });
   const setPadding = (key: keyof FrameLayout['padding'], v: number) =>
-    set({ padding: { ...layout.padding, [key]: v } });
+    set({ padding: { ...padding, [key]: v } });
 
   return (
     <>
@@ -43,7 +44,7 @@ function LayoutPanel({ ctx }: { ctx: PropertyContextValue }) {
             <NumberField
               label="Pad"
               min={0}
-              value={layout.padding.top}
+              value={padding.top}
               onCommit={(v) =>
                 set({ padding: { top: v, right: v, bottom: v, left: v } })
               }
@@ -51,25 +52,25 @@ function LayoutPanel({ ctx }: { ctx: PropertyContextValue }) {
             <NumberField
               label="T"
               min={0}
-              value={layout.padding.top}
+              value={padding.top}
               onCommit={(v) => setPadding('top', v)}
             />
             <NumberField
               label="R"
               min={0}
-              value={layout.padding.right}
+              value={padding.right}
               onCommit={(v) => setPadding('right', v)}
             />
             <NumberField
               label="B"
               min={0}
-              value={layout.padding.bottom}
+              value={padding.bottom}
               onCommit={(v) => setPadding('bottom', v)}
             />
             <NumberField
               label="L"
               min={0}
-              value={layout.padding.left}
+              value={padding.left}
               onCommit={(v) => setPadding('left', v)}
             />
           </div>
