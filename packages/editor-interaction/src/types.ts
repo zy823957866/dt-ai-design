@@ -3,16 +3,23 @@ import type { LayerTypeString } from '@dt-ai-design/design-schema';
 // ������ Tool ID ������
 
 export type CanvasToolId =
-  | 'select'
+  | 'move'
+  | 'scale'
   | 'hand'
+  | 'comment'
   | 'zoom'
   | 'rectangle'
   | 'ellipse'
-  | 'triangle'
-  | 'frame'
+  | 'polygon'
+  | 'icon'
+  | 'script'
+  | 'pen'
+  | 'pen_move'
+  | 'pen_cut'
   | 'text'
+  | 'frame'
   | 'sticky'
-  | 'pen';
+  | 'browser';
 
 // ������ Interaction Mode ������
 

@@ -2,7 +2,7 @@ import type { InteractionState } from '../types';
 
 export function createInitialInteractionState(): InteractionState {
   return {
-    activeTool: 'select',
+    activeTool: 'move',
     mode: 'idle',
     selectedLayerIds: [],
     draft: null,
