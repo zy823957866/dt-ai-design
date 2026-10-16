@@ -17,7 +17,7 @@ export const listOpencodeModels = async (
 ): Promise<AgentModelInfo[]> => {
   const command =
     options.command ?? process.env.OPENCODE_CLI_PATH ?? 'opencode';
-  const child = spawnCli(command, ['models']);
+  const child = spawnCli(command, ['models', '--standalone']);
   let spawnError: Error | undefined;
   child.once('error', (error) => {
     spawnError = error;

@@ -116,11 +116,14 @@ export function registerIpcHandlers(): void {
     async (_event, tool: AgentTool) => {
       const definition = toolRegistry[tool];
       if (!definition) return [];
+      const command = resolveToolCommand(tool);
       try {
-        return await definition.listModels({
-          command: resolveToolCommand(tool),
-        });
-      } catch {
+        return await definition.listModels({ command });
+      } catch (error) {
+        console.error(
+          `[listModels] tool=${tool} command=${command} error=`,
+          error,
+        );
         return [];
       }
     },
