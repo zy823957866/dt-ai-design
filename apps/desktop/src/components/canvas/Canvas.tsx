@@ -508,6 +508,7 @@ export function Canvas() {
           width: 160,
           height: 24,
           content: '',
+          fills: [{ type: 'solid', color: '#000000', opacity: 1 }],
         });
         const newId = editor.getSelection().layerIds[0];
         if (newId) setEditingTextId(newId);
