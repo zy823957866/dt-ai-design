@@ -22,6 +22,8 @@ export interface CanvasDocumentRendererProps {
   doc: DesignDocument;
   selectedIds: string[];
   hoveredId: string | null;
+  /** 正在内联编辑的文字图层 id（该图层不渲染 SVG 文本，避免与输入框重影） */
+  editingTextId?: string | null;
   onLayerClick: (e: React.MouseEvent, layerId: string) => void;
   onLayerDoubleClick: (e: React.MouseEvent, layerId: string) => void;
   onLayerEnter: (layerId: string) => void;
@@ -111,6 +113,7 @@ interface LayerNodeProps {
   doc: DesignDocument;
   selected: boolean;
   hovered: boolean;
+  editingTextId?: string | null;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick?: (e: React.MouseEvent) => void;
   onMouseEnter: () => void;
@@ -122,6 +125,7 @@ function LayerNode({
   doc,
   selected,
   hovered,
+  editingTextId,
   onClick,
   onDoubleClick,
   onMouseEnter,
@@ -139,6 +143,7 @@ function LayerNode({
           doc={doc}
           selected={selected}
           hovered={hovered}
+          editingTextId={editingTextId}
           {...common}
         />
       );
@@ -149,6 +154,7 @@ function LayerNode({
           doc={doc}
           selected={selected}
           hovered={hovered}
+          editingTextId={editingTextId}
           {...common}
         />
       );
@@ -192,6 +198,7 @@ function LayerNode({
       return (
         <TextLayerNode
           layer={layer as TextLayer}
+          editing={editingTextId === layer.id}
           selected={selected}
           hovered={hovered}
           {...common}
@@ -228,6 +235,7 @@ function LayerNode({
 function FrameLayerNode({
   layer,
   doc,
+  editingTextId,
   onClick,
   onDoubleClick,
   onMouseEnter,
@@ -237,6 +245,7 @@ function FrameLayerNode({
   doc: DesignDocument;
   selected: boolean;
   hovered: boolean;
+  editingTextId?: string | null;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick?: (e: React.MouseEvent) => void;
   onMouseEnter: () => void;
@@ -279,6 +288,7 @@ function FrameLayerNode({
             key={childId}
             layer={child}
             doc={doc}
+            editingTextId={editingTextId}
             selected={false}
             hovered={false}
             onClick={(e) => {
@@ -306,6 +316,7 @@ function FrameLayerNode({
 function GroupLayerNode({
   layer,
   doc,
+  editingTextId,
   onClick,
   onDoubleClick,
   onMouseEnter,
@@ -315,6 +326,7 @@ function GroupLayerNode({
   doc: DesignDocument;
   selected: boolean;
   hovered: boolean;
+  editingTextId?: string | null;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick?: (e: React.MouseEvent) => void;
   onMouseEnter: () => void;
@@ -342,6 +354,7 @@ function GroupLayerNode({
             key={childId}
             layer={child}
             doc={doc}
+            editingTextId={editingTextId}
             selected={false}
             hovered={false}
             onClick={(e) => {
@@ -601,12 +614,14 @@ function BrowserLayerNode({
 
 function TextLayerNode({
   layer,
+  editing,
   onClick,
   onDoubleClick,
   onMouseEnter,
   onMouseLeave,
 }: {
   layer: TextLayer;
+  editing?: boolean;
   selected: boolean;
   hovered: boolean;
   onClick: (e: React.MouseEvent) => void;
@@ -652,7 +667,7 @@ function TextLayerNode({
         onMouseLeave={onMouseLeave}
         filter={filter || undefined}
       >
-        {layer.content || ''}
+        {editing ? '' : layer.content || ''}
       </text>
     </g>
   );
@@ -721,6 +736,7 @@ export function CanvasDocumentRenderer({
   doc,
   selectedIds,
   hoveredId,
+  editingTextId,
   onLayerClick,
   onLayerDoubleClick,
   onLayerEnter,
@@ -745,6 +761,7 @@ export function CanvasDocumentRenderer({
           doc={doc}
           selected={selectedIds.includes(layer.id)}
           hovered={hoveredId === layer.id}
+          editingTextId={editingTextId}
           onClick={(e) => onLayerClick(e, layer.id)}
           onDoubleClick={(e) => onLayerDoubleClick(e, layer.id)}
           onMouseEnter={() => onLayerEnter(layer.id)}

@@ -896,6 +896,7 @@ export function Canvas() {
             doc={doc}
             selectedIds={selection.layerIds}
             hoveredId={hoveredId}
+            editingTextId={editingTextId}
             onLayerClick={() => {}}
             onLayerDoubleClick={handleTextDoubleClick}
             onLayerEnter={handleLayerEnter}
