@@ -5,6 +5,8 @@ export const fillTypeSchema = z.enum([
   'solid',
   'linearGradient',
   'radialGradient',
+  'angularGradient',
+  'meshGradient',
   'image',
 ]);
 
@@ -17,6 +19,7 @@ export const fillStyleSchema = z.object({
   type: fillTypeSchema,
   color: z.string().optional(),
   gradientStops: z.array(gradientStopSchema).optional(),
+  gradientType: z.enum(['linear', 'radial', 'angular', 'mesh']).optional(),
   imageSrc: z.string().optional(),
   opacity: z.number().min(0).max(1),
 });
@@ -38,6 +41,7 @@ export const effectTypeSchema = z.enum([
   'blur',
   'outerGlow',
   'innerGlow',
+  'shader',
 ]);
 
 export const effectStyleSchema = z.object({

@@ -5,6 +5,8 @@ export const FillType = {
   SOLID: 'solid',
   LINEAR_GRADIENT: 'linearGradient',
   RADIAL_GRADIENT: 'radialGradient',
+  ANGULAR_GRADIENT: 'angularGradient',
+  MESH_GRADIENT: 'meshGradient',
   IMAGE: 'image',
 } as const;
 export type FillType = (typeof FillType)[keyof typeof FillType];
@@ -19,6 +21,7 @@ export interface FillStyle {
   color?: string;
   gradientStops?: GradientStop[];
   gradientAngle?: number;
+  gradientType?: 'linear' | 'radial' | 'angular' | 'mesh';
   imageSrc?: string;
   imageFit?: ImageFitMode;
   opacity: number;
@@ -77,6 +80,7 @@ export const EffectType = {
   INNER_GLOW: 'innerGlow',
   LAYER_BLUR: 'layerBlur',
   BACKGROUND_BLUR: 'backgroundBlur',
+  SHADER: 'shader',
 } as const;
 export type EffectType = (typeof EffectType)[keyof typeof EffectType];
 
