@@ -238,7 +238,7 @@ export function createLayer(
         textAlign: 'left',
         verticalAlign: 'top',
         textDecoration: 'none',
-        fills: [{ type: 'solid' as const, color: '#E4E4E7', opacity: 1 }],
+        fills: [{ type: 'solid' as const, color: '#000000', opacity: 1 }],
         strokes: [],
         sizing: 'autoHeight',
         ...props,

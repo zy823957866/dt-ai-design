@@ -642,7 +642,7 @@ function TextLayerNode({
         fontSize={layer.fontSize}
         fontWeight={layer.fontWeight}
         fontFamily={layer.fontFamily || 'var(--font-sans)'}
-        fill={fill?.color || '#e4e4e7'}
+        fill={fill?.color || '#000000'}
         opacity={layer.opacity}
         textAnchor={anchor}
         style={textStyle}

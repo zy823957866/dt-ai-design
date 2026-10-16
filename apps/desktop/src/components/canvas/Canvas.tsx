@@ -1101,7 +1101,7 @@ export function Canvas() {
                 fontSize: textLayer.fontSize * viewport.zoom + 'px',
                 fontWeight: textLayer.fontWeight,
                 fontFamily: textLayer.fontFamily || 'var(--font-sans)',
-                color: fill?.color || '#e4e4e7',
+                color: fill?.color || '#000000',
                 textAlign: textAlignStyle,
                 letterSpacing: textLayer.letterSpacing
                   ? textLayer.letterSpacing * viewport.zoom + 'px'
