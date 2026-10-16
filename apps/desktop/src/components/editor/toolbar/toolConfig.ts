@@ -3,7 +3,6 @@ import {
   MousePointer2,
   Scaling,
   Hand,
-  MessageSquare,
   Square,
   Circle,
   Pentagon,
@@ -12,8 +11,6 @@ import {
   StickyNote,
   PenTool,
   Globe,
-  Box,
-  Code2,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -60,7 +57,6 @@ export const TOOL_GROUPS: ToolGroup[] = [
     id: 'primitives',
     separatorBefore: true,
     flyout: true,
-    pinned: 2,
     tools: [
       {
         id: 'rectangle',
@@ -80,16 +76,8 @@ export const TOOL_GROUPS: ToolGroup[] = [
         id: 'polygon',
         label: 'Polygon',
         shortcut: '',
-        enabled: false,
+        enabled: true,
         icon: Pentagon,
-      },
-      { id: 'icon', label: 'Icon', shortcut: '', enabled: false, icon: Box },
-      {
-        id: 'script',
-        label: 'Script',
-        shortcut: '',
-        enabled: false,
-        icon: Code2,
       },
     ],
   },
@@ -144,7 +132,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
         id: 'browser',
         label: 'Browser',
         shortcut: '',
-        enabled: false,
+        enabled: true,
         icon: Globe,
       },
     ],
@@ -156,18 +144,6 @@ export const TOOL_GROUPS: ToolGroup[] = [
       { id: 'hand', label: 'Hand', shortcut: 'H', enabled: true, icon: Hand },
     ],
   },
-  {
-    id: 'comment',
-    tools: [
-      {
-        id: 'comment',
-        label: 'Comment',
-        shortcut: 'C',
-        enabled: false,
-        icon: MessageSquare,
-      },
-    ],
-  },
 ];
 
-export const SHAPE_TOOLS = ['rectangle', 'ellipse', 'frame'] as const;
+export const SHAPE_TOOLS = ['rectangle', 'ellipse', 'polygon'] as const;

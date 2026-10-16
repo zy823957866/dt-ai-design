@@ -762,7 +762,11 @@ export function Canvas() {
     if (interactionMode === 'panning') return 'grabbing';
     if (activeTool === 'hand' || interactionState.isSpacePressed) return 'grab';
     if (activeTool === 'zoom') return 'zoom-in';
-    if (['rectangle', 'ellipse', 'frame'].includes(activeTool))
+    if (
+      ['rectangle', 'ellipse', 'polygon', 'frame', 'browser'].includes(
+        activeTool,
+      )
+    )
       return 'crosshair';
     return 'default';
   };

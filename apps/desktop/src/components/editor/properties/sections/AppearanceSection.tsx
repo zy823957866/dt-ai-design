@@ -7,6 +7,7 @@ import type {
   EllipseLayer,
   FrameLayer,
   ImageLayer,
+  PolygonLayer,
   RectangleLayer,
 } from '@dt-ai-design/design-schema';
 
@@ -43,7 +44,8 @@ function AppearancePanel({ ctx }: { ctx: PropertyContextValue }) {
   const hasCorner =
     layer.type === 'rectangle' ||
     layer.type === 'frame' ||
-    layer.type === 'image';
+    layer.type === 'image' ||
+    layer.type === 'polygon';
 
   return (
     <>
@@ -98,6 +100,25 @@ function AppearancePanel({ ctx }: { ctx: PropertyContextValue }) {
             max={100}
             value={(layer as EllipseLayer).innerRadius}
             onCommit={(v) => set('innerRadius', v)}
+          />
+        </div>
+      )}
+      {layer.type === 'polygon' && (
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <NumberField
+            label="Sides"
+            min={3}
+            max={60}
+            value={(layer as PolygonLayer).polygonCount}
+            onCommit={(v) =>
+              editor.setLayerProperty(layer.id, 'polygonCount', Math.round(v))
+            }
+          />
+          <NumberField
+            label="Radius"
+            min={0}
+            value={cornerValue((layer as PolygonLayer).cornerRadius)}
+            onCommit={(v) => set('cornerRadius', v)}
           />
         </div>
       )}

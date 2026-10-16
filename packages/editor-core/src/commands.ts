@@ -16,11 +16,13 @@ import type { Command } from './command';
 type LayerTypeString =
   | 'rectangle'
   | 'ellipse'
+  | 'polygon'
   | 'text'
   | 'image'
   | 'frame'
   | 'group'
   | 'stickyNote'
+  | 'browser'
   | 'path'
   | 'line'
   | 'componentInstance';

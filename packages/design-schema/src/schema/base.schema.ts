@@ -10,6 +10,8 @@ export const layerTypeSchema = z.enum([
   'stickyNote',
   'path',
   'line',
+  'polygon',
+  'browser',
   'componentInstance',
 ]);
 

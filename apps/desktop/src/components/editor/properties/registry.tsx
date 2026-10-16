@@ -8,6 +8,7 @@ import { FillSection } from './sections/FillSection';
 import { StrokeSection } from './sections/StrokeSection';
 import { TypographySection } from './sections/TypographySection';
 import { EffectsSection } from './sections/EffectsSection';
+import { BrowserSection } from './sections/BrowserSection';
 import { ExportSection } from './sections/ExportSection';
 import { MetadataSection } from './sections/MetadataSection';
 
@@ -21,6 +22,7 @@ export const PROPERTY_SECTIONS: PropertySection[] = [
   StrokeSection,
   TypographySection,
   EffectsSection,
+  BrowserSection,
   ExportSection,
   MetadataSection,
 ];

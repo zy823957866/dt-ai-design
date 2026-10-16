@@ -2,10 +2,12 @@
   Layer,
   RectangleLayer,
   EllipseLayer,
+  PolygonLayer,
   FrameLayer,
   TextLayer,
   ImageLayer,
   StickyNoteLayer,
+  BrowserLayer,
   PathLayer,
   LineLayer,
   GroupLayer,
@@ -22,11 +24,13 @@ import { generateId } from './id';
 export type LayerTypeString =
   | 'rectangle'
   | 'ellipse'
+  | 'polygon'
   | 'text'
   | 'image'
   | 'frame'
   | 'group'
   | 'stickyNote'
+  | 'browser'
   | 'path'
   | 'line'
   | 'componentInstance';
@@ -80,11 +84,13 @@ function defaultLayerName(type: LayerTypeString): string {
   const baseNames: Record<LayerTypeString, string> = {
     rectangle: 'Rectangle',
     ellipse: 'Ellipse',
+    polygon: 'Polygon',
     text: 'Text',
     image: 'Image',
     frame: 'Frame',
     group: 'Group',
     stickyNote: 'Sticky Note',
+    browser: 'Browser',
     path: 'Path',
     line: 'Line',
     componentInstance: 'Component',
@@ -132,6 +138,14 @@ export function createLayer(
   type: 'ellipse',
   props?: Partial<EllipseLayer>,
 ): EllipseLayer;
+export function createLayer(
+  type: 'polygon',
+  props?: Partial<PolygonLayer>,
+): PolygonLayer;
+export function createLayer(
+  type: 'browser',
+  props?: Partial<BrowserLayer>,
+): BrowserLayer;
 export function createLayer(
   type: 'text',
   props?: Partial<TextLayer>,
@@ -192,6 +206,25 @@ export function createLayer(
         innerRadius: 0,
         ...props,
       } as EllipseLayer;
+
+    case 'polygon':
+      return {
+        ...base,
+        fills: [{ ...defaultFill }],
+        strokes: [],
+        effects: [],
+        cornerRadius: 0,
+        polygonCount: 6,
+        ...props,
+      } as PolygonLayer;
+
+    case 'browser':
+      return {
+        ...base,
+        url: '',
+        zoom: 1,
+        ...props,
+      } as BrowserLayer;
 
     case 'text':
       return {

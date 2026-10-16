@@ -33,14 +33,16 @@ function boundsFromPoints(
 }
 
 function isShapeTool(tool: string): boolean {
-  return ['rectangle', 'ellipse', 'frame'].includes(tool);
+  return ['rectangle', 'ellipse', 'polygon', 'frame', 'browser'].includes(tool);
 }
 
 /** 工具 → 图层类型（用于 createLayer 命令） */
 export function toolToLayerType(tool: string): LayerTypeString | null {
   if (tool === 'rectangle') return 'rectangle';
   if (tool === 'ellipse') return 'ellipse';
+  if (tool === 'polygon') return 'polygon';
   if (tool === 'frame') return 'frame';
+  if (tool === 'browser') return 'browser';
   if (tool === 'sticky') return 'stickyNote';
   if (tool === 'path' || tool === 'pen') return 'path';
   return null;

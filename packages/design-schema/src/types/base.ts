@@ -11,6 +11,8 @@ export const LayerType = {
   STICKY_NOTE: 'stickyNote',
   PATH: 'path',
   LINE: 'line',
+  POLYGON: 'polygon',
+  BROWSER: 'browser',
   COMPONENT_INSTANCE: 'componentInstance',
 } as const;
 export type LayerType = (typeof LayerType)[keyof typeof LayerType];

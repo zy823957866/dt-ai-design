@@ -39,6 +39,27 @@ export const ellipseLayerSchema = baseLayerSchema.extend({
   index: z.number().int().min(0),
 });
 
+// Polygon
+export const polygonLayerSchema = baseLayerSchema.extend({
+  type: z.literal('polygon'),
+  fills: z.array(fillStyleSchema),
+  strokes: z.array(strokeStyleSchema),
+  effects: z.array(effectStyleSchema),
+  cornerRadius: cornerRadiusSchema,
+  polygonCount: z.number().int().min(3).max(60),
+  parentId: z.string().nullable(),
+  index: z.number().int().min(0),
+});
+
+// Browser
+export const browserLayerSchema = baseLayerSchema.extend({
+  type: z.literal('browser'),
+  url: z.string(),
+  zoom: z.number(),
+  parentId: z.string().nullable(),
+  index: z.number().int().min(0),
+});
+
 // Text
 export const textLayerSchema = baseLayerSchema.extend({
   type: z.literal('text'),
@@ -174,11 +195,13 @@ export const componentInstanceLayerSchema = baseLayerSchema.extend({
 export const layerSchema = z.discriminatedUnion('type', [
   rectangleLayerSchema,
   ellipseLayerSchema,
+  polygonLayerSchema,
   textLayerSchema,
   imageLayerSchema,
   frameLayerSchema,
   groupLayerSchema,
   stickyNoteLayerSchema,
+  browserLayerSchema,
   pathLayerSchema,
   lineLayerSchema,
   componentInstanceLayerSchema,

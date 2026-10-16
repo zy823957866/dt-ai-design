@@ -37,6 +37,26 @@ export interface EllipseLayer extends BaseLayer {
   innerRadius: number;
 }
 
+/** 多边形图层 */
+export interface PolygonLayer extends BaseLayer {
+  type: 'polygon';
+  fills: FillStyle[];
+  strokes: StrokeStyle[];
+  effects: EffectStyle[];
+  cornerRadius: CornerRadius;
+  /** 边数，3–60 */
+  polygonCount: number;
+}
+
+/** 浏览器图层（画布内嵌网页） */
+export interface BrowserLayer extends BaseLayer {
+  type: 'browser';
+  /** 网页 URL */
+  url: string;
+  /** 页面缩放，默认 1 */
+  zoom: number;
+}
+
 /** 文字图层 */
 export interface TextLayer extends BaseLayer {
   type: 'text';
@@ -162,11 +182,13 @@ export interface ComponentInstanceLayer extends BaseLayer {
 export type Layer =
   | RectangleLayer
   | EllipseLayer
+  | PolygonLayer
   | TextLayer
   | ImageLayer
   | FrameLayer
   | GroupLayer
   | StickyNoteLayer
+  | BrowserLayer
   | PathLayer
   | LineLayer
   | ComponentInstanceLayer;

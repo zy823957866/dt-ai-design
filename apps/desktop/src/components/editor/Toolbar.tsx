@@ -99,26 +99,25 @@ function FlyoutGroup({
   setOpen,
   onSelect,
 }: {
-  group: { id: string; tools: ToolDef[]; pinned?: number };
+  group: { id: string; tools: ToolDef[] };
   activeTool: CanvasToolId;
   open: boolean;
   setOpen: (v: boolean) => void;
   onSelect: (id: CanvasToolId) => void;
 }) {
-  const pinned = group.tools.slice(0, group.pinned ?? 1);
-  const rest = group.tools.slice(group.pinned ?? 1);
+  const current =
+    group.tools.find((t) => t.id === activeTool) ?? group.tools[0];
+  const isActive = group.tools.some((t) => t.id === activeTool);
 
   return (
     <div className="flex items-center gap-[2px]">
-      {pinned.map((tool) => (
-        <div key={tool.id} className="flex-1">
-          <ToolButton
-            tool={tool}
-            active={activeTool === tool.id}
-            onSelect={() => tool.enabled && onSelect(tool.id)}
-          />
-        </div>
-      ))}
+      <div className="flex-1">
+        <ToolButton
+          tool={current}
+          active={isActive}
+          onSelect={() => current.enabled && onSelect(current.id)}
+        />
+      </div>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
@@ -129,7 +128,7 @@ function FlyoutGroup({
           </button>
         </PopoverTrigger>
         <PopoverContent side="right" sideOffset={8} className="w-40 p-1">
-          {rest.map((tool) => {
+          {group.tools.map((tool) => {
             const RIcon = tool.icon;
             return (
               <button
@@ -141,7 +140,11 @@ function FlyoutGroup({
                   onSelect(tool.id);
                   setOpen(false);
                 }}
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs text-text-secondary hover:bg-bg-hover disabled:opacity-40"
+                className={`flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-bg-hover disabled:opacity-40 ${
+                  activeTool === tool.id
+                    ? 'text-accent-text'
+                    : 'text-text-secondary'
+                }`}
               >
                 <RIcon className="h-3.5 w-3.5" />
                 {tool.label}
