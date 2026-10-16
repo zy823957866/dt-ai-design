@@ -3,8 +3,10 @@ import { useEditorInteraction } from '../EditorInteractionProvider';
 import { TOOL_GROUPS } from './toolConfig';
 import type { CanvasToolId } from '@dt-ai-design/editor-interaction';
 
+const PEN_TOOL_IDS: CanvasToolId[] = ['pen', 'pen_move', 'pen_cut'];
+
 export function useToolShortcuts() {
-  const { dispatch } = useEditorInteraction();
+  const { state, dispatch } = useEditorInteraction();
 
   useEffect(() => {
     const map = new Map<string, CanvasToolId>();
@@ -30,6 +32,32 @@ export function useToolShortcuts() {
         dispatch({ type: 'escape' });
         return;
       }
+
+      // 钢笔子工具：仅当处于钢笔流程时，P/V/X/Enter 走子工具
+      if (PEN_TOOL_IDS.includes(state.activeTool)) {
+        const key = e.key.toUpperCase();
+        if (key === 'P') {
+          e.preventDefault();
+          dispatch({ type: 'selectTool', tool: 'pen' });
+          return;
+        }
+        if (key === 'V') {
+          e.preventDefault();
+          dispatch({ type: 'selectTool', tool: 'pen_move' });
+          return;
+        }
+        if (key === 'X') {
+          e.preventDefault();
+          dispatch({ type: 'selectTool', tool: 'pen_cut' });
+          return;
+        }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          dispatch({ type: 'selectTool', tool: 'move' });
+          return;
+        }
+      }
+
       const tool = map.get(e.key.toUpperCase());
       if (tool) {
         e.preventDefault();
@@ -39,5 +67,5 @@ export function useToolShortcuts() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [dispatch]);
+  }, [dispatch, state.activeTool]);
 }
