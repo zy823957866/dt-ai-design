@@ -51,4 +51,12 @@ describe('normalizeDocument', () => {
     expect(layout.gap).toBe(12);
     expect((doc.layers.f1.layout as { enabled?: boolean }).enabled).toBe(true);
   });
+
+  it('returns null unchanged without throwing', () => {
+    expect(normalizeDocument(null)).toBeNull();
+  });
+
+  it('returns undefined unchanged without throwing', () => {
+    expect(normalizeDocument(undefined)).toBeUndefined();
+  });
 });

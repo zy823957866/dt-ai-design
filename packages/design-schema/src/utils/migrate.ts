@@ -33,9 +33,15 @@ export function normalizeFrameLayout(raw: unknown): FrameLayout {
 
 /** 归一化整篇文档中的 frame layout（兼容旧结构） */
 export function normalizeDocument<T>(doc: T): T {
-  const next = JSON.parse(JSON.stringify(doc)) as {
-    layers?: Record<string, { type?: string; layout?: unknown }>;
-  };
+  if (doc == null || typeof doc !== 'object') return doc;
+
+  let next: { layers?: Record<string, { type?: string; layout?: unknown }> };
+  try {
+    next = JSON.parse(JSON.stringify(doc));
+  } catch {
+    return doc;
+  }
+
   if (next.layers) {
     for (const layer of Object.values(next.layers)) {
       if (layer && layer.type === 'frame' && layer.layout != null) {
