@@ -242,7 +242,7 @@ function ToolSelector({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-[26px] items-center gap-1.5 rounded-[13px] bg-bg-active px-2.5 text-[11px] font-semibold text-text-primary hover:bg-bg-hover"
+        className="flex h-[26px] w-full items-center justify-between rounded-[13px] bg-bg-active px-2.5 text-[11px] font-semibold text-text-primary hover:bg-bg-hover"
       >
         <span>{current.label}</span>
         <ChevronDown className="h-2.5 w-2.5 text-text-muted" />
@@ -251,7 +251,7 @@ function ToolSelector({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-[30px] left-0 z-20 min-w-[104px] overflow-hidden rounded-lg border border-border bg-bg-popover py-1 shadow-popover">
+          <div className="absolute bottom-[30px] left-0 z-20 w-full overflow-hidden rounded-lg border border-border bg-bg-popover py-1 shadow-popover">
             {AGENT_TOOLS.map((option) => (
               <button
                 key={option.id}
@@ -288,7 +288,21 @@ function ModelSelector({
   onModelChange: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const current = models.find((option) => option.id === model);
+  const keyword = query.trim().toLowerCase();
+  const filtered = keyword
+    ? models.filter(
+        (option) =>
+          option.label.toLowerCase().includes(keyword) ||
+          option.id.toLowerCase().includes(keyword),
+      )
+    : models;
+
+  const close = () => {
+    setOpen(false);
+    setQuery('');
+  };
 
   return (
     <div className="relative">
@@ -296,33 +310,54 @@ function ModelSelector({
         type="button"
         onClick={() => setOpen((v) => !v)}
         disabled={loading}
-        className="flex h-[26px] items-center gap-1.5 rounded-[13px] bg-bg-active px-2.5 text-[11px] font-semibold text-text-primary hover:bg-bg-hover disabled:opacity-40"
+        className="flex h-[26px] w-full items-center justify-between rounded-[13px] bg-bg-active px-2.5 text-[11px] font-semibold text-text-primary hover:bg-bg-hover disabled:opacity-40"
       >
-        <span>{current?.label ?? MODEL_FALLBACK_LABEL}</span>
-        <ChevronDown className="h-2.5 w-2.5 text-text-muted" />
+        <span className="truncate">
+          {current?.label ?? MODEL_FALLBACK_LABEL}
+        </span>
+        <ChevronDown className="h-2.5 w-2.5 shrink-0 text-text-muted" />
       </button>
 
       {open && models.length > 0 && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-[30px] left-0 z-20 min-w-[104px] overflow-hidden rounded-lg border border-border bg-bg-popover py-1 shadow-popover">
-            {models.map((option) => (
-              <button
-                key={option.id}
-                onClick={() => {
-                  onModelChange(option.id);
-                  setOpen(false);
-                }}
-                className={`flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-[11.5px] hover:bg-bg-hover ${
-                  option.id === model
-                    ? 'bg-accent-soft text-accent-text'
-                    : 'text-text-secondary'
-                }`}
-              >
-                <span>{option.label}</span>
-                {option.id === model && <Check className="h-3 w-3" />}
-              </button>
-            ))}
+          <div className="fixed inset-0 z-10" onClick={close} />
+          <div className="absolute bottom-[30px] left-0 z-20 w-full overflow-hidden rounded-lg border border-border bg-bg-popover shadow-popover">
+            <div className="border-b border-border p-1.5">
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="搜索模型…"
+                className="h-6 w-full rounded-md bg-bg-input px-2 text-[11px] text-text-primary placeholder:text-text-tertiary outline-none"
+              />
+            </div>
+            <div className="max-h-[250px] overflow-y-auto py-1">
+              {filtered.length === 0 ? (
+                <div className="px-3 py-1.5 text-[11px] text-text-muted">
+                  无匹配模型
+                </div>
+              ) : (
+                filtered.map((option) => (
+                  <button
+                    key={option.id}
+                    onClick={() => {
+                      onModelChange(option.id);
+                      close();
+                    }}
+                    className={`flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-[11.5px] hover:bg-bg-hover ${
+                      option.id === model
+                        ? 'bg-accent-soft text-accent-text'
+                        : 'text-text-secondary'
+                    }`}
+                  >
+                    <span className="truncate">{option.label}</span>
+                    {option.id === model && (
+                      <Check className="h-3 w-3 shrink-0" />
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
           </div>
         </>
       )}
@@ -457,7 +492,7 @@ function ChatTab({ projectId }: { projectId?: string }) {
         {modelError && (
           <div className="mt-1 text-[11px] text-red-400">{modelError}</div>
         )}
-        <div className="mt-2.5 flex items-center gap-2.5">
+        <div className="mt-2.5 flex flex-col gap-2">
           <ToolSelector tool={tool} onToolChange={setTool} />
           <ModelSelector
             models={models}
@@ -465,37 +500,42 @@ function ChatTab({ projectId }: { projectId?: string }) {
             loading={loading}
             onModelChange={setModel}
           />
-          <CountStepper count={variantCount} onCountChange={setVariantCount} />
-          <div className="flex-1" />
-          {isRunning ? (
-            <button
-              onClick={() => void cancel()}
-              className="flex h-[26px] w-8 items-center justify-center rounded-[13px] bg-red-500 text-white hover:bg-red-600"
-              title="停止生成"
-            >
-              <Square className="h-[10px] w-[10px] fill-current" />
-            </button>
-          ) : (
-            <button
-              onClick={handleSend}
-              disabled={!input.trim()}
-              className="flex h-[26px] w-8 items-center justify-center rounded-[13px] bg-accent text-white disabled:opacity-40"
-              title="发送"
-            >
-              <svg
-                className="h-[11px] w-[11px]"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+          <div className="flex items-center gap-2.5">
+            <CountStepper
+              count={variantCount}
+              onCountChange={setVariantCount}
+            />
+            <div className="flex-1" />
+            {isRunning ? (
+              <button
+                onClick={() => void cancel()}
+                className="flex h-[26px] w-8 items-center justify-center rounded-[13px] bg-red-500 text-white hover:bg-red-600"
+                title="停止生成"
               >
-                <line x1="12" y1="19" x2="12" y2="5" />
-                <polyline points="5 12 12 5 19 12" />
-              </svg>
-            </button>
-          )}
+                <Square className="h-[10px] w-[10px] fill-current" />
+              </button>
+            ) : (
+              <button
+                onClick={handleSend}
+                disabled={!input.trim()}
+                className="flex h-[26px] w-8 items-center justify-center rounded-[13px] bg-accent text-white disabled:opacity-40"
+                title="发送"
+              >
+                <svg
+                  className="h-[11px] w-[11px]"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="12" y1="19" x2="12" y2="5" />
+                  <polyline points="5 12 12 5 19 12" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
