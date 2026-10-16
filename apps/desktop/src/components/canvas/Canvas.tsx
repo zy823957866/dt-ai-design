@@ -501,6 +501,7 @@ export function Canvas() {
 
       // 文字工具：点击创建空的文字图层并进入内联编辑
       if (activeTool === 'text') {
+        e.preventDefault();
         editor.addLayer('text', {
           x: canvasPos.x,
           y: canvasPos.y,
@@ -1074,6 +1075,7 @@ export function Canvas() {
             <textarea
               ref={textareaRef}
               defaultValue={textLayer.content || ''}
+              onMouseDown={(e) => e.stopPropagation()}
               onBlur={() => finishTextEditing(false)}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
