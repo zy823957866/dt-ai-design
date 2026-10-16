@@ -1023,6 +1023,7 @@ export function Canvas() {
       <ViewportSelectionOverlay
         layers={
           selection.layerIds
+            .filter((id) => id !== editingTextId)
             .map((id) => doc.layers[id])
             .filter(Boolean) as Layer[]
         }
@@ -1109,7 +1110,7 @@ export function Canvas() {
                   ? textLayer.letterSpacing * viewport.zoom + 'px'
                   : undefined,
                 background: 'transparent',
-                border: '1px solid #8b5cf6',
+                border: 'none',
                 outline: 'none',
                 padding: '0',
                 margin: '0',
