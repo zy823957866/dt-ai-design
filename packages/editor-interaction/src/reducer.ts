@@ -371,18 +371,27 @@ export function reduceInteraction(
       }
 
       if (state.mode === 'creatingShape' && state.draft) {
-        const bounds = boundsFromPoints(
+        const raw = boundsFromPoints(
           state.draft.startPoint,
           state.draft.currentPoint,
         );
-        const isMeaningful = bounds.width > 4 && bounds.height > 4;
+        // 点击（几乎无拖拽）按默认尺寸创建；拖拽则按拖拽范围创建
+        const isClick = raw.width <= 4 && raw.height <= 4;
+        const bounds: CreationBounds = isClick
+          ? {
+              x: state.draft.startPoint.x,
+              y: state.draft.startPoint.y,
+              width: 100,
+              height: 100,
+            }
+          : raw;
 
         const endCommands: InteractionCommand[] = [
           { type: 'clearCreationOverlay' },
         ];
 
         const layerType = toolToLayerType(state.activeTool);
-        if (isMeaningful && layerType) {
+        if (layerType) {
           endCommands.push({
             type: 'createLayer',
             layerType,

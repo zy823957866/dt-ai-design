@@ -118,8 +118,8 @@ function FlyoutGroup({
     group.tools.find((t) => t.id === lastPrimitive) ?? group.tools[0];
 
   return (
-    <div className="flex items-center gap-[2px]">
-      <div className="flex-1">
+    <div className="flex flex-col items-center gap-[1px]">
+      <div className="w-full">
         <ToolButton
           tool={current}
           active={isActive}
@@ -130,7 +130,7 @@ function FlyoutGroup({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="flex h-[27px] w-3 items-center justify-center rounded-sm text-text-tertiary hover:bg-bg-hover"
+            className="flex h-2.5 w-full items-center justify-center rounded-sm text-text-tertiary hover:bg-bg-hover"
           >
             <ChevronRight className="h-3 w-3 rotate-90" />
           </button>

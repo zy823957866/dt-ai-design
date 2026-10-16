@@ -48,8 +48,12 @@ function textAlignToAnchor(
 
 export function Canvas() {
   const editor = useEditor();
-  const { state: interactionState, dispatch: interactionDispatch } =
-    useEditorInteraction();
+  const { interaction, state: interactionState } = useEditorInteraction();
+  const interactionDispatch = useCallback(
+    (event: Parameters<typeof interaction.dispatch>[0]) =>
+      interaction.dispatch(event),
+    [interaction],
+  );
 
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -428,6 +432,17 @@ export function Canvas() {
           case 'updateCreationOverlay':
           case 'clearCreationOverlay':
             break;
+          case 'createLayer': {
+            const w = Math.max(cmd.bounds.width, 1);
+            const h = Math.max(cmd.bounds.height, 1);
+            editor.addLayer(cmd.layerType, {
+              x: cmd.bounds.x,
+              y: cmd.bounds.y,
+              width: w,
+              height: h,
+            });
+            break;
+          }
           default:
             break;
         }
@@ -483,6 +498,21 @@ export function Canvas() {
       }
 
       if (e.button !== 0) return;
+
+      // 文字工具：点击创建文字图层并进入内联编辑
+      if (activeTool === 'text') {
+        editor.addLayer('text', {
+          x: canvasPos.x,
+          y: canvasPos.y,
+          width: 160,
+          height: 24,
+        });
+        const newId = editor.getSelection().layerIds[0];
+        if (newId) setEditingTextId(newId);
+        editor.setActiveTool('move');
+        interactionDispatch({ type: 'selectTool', tool: 'move' });
+        return;
+      }
 
       const hit = hitTestAtPoint(canvasPos.x, canvasPos.y);
 
