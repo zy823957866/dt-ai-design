@@ -38,6 +38,13 @@ const defaultFill: FillStyle = {
   opacity: 1,
 };
 
+/** 矩形/圆形等形状的默认填充 */
+const defaultShapeFill: FillStyle = {
+  type: 'solid',
+  color: '#CCCCCC',
+  opacity: 1,
+};
+
 /** 默认描边 */
 const defaultStroke: StrokeStyle = {
   color: '#E4E4E7',
@@ -167,7 +174,7 @@ export function createLayer(
     case 'rectangle':
       return {
         ...base,
-        fills: [{ ...defaultFill }],
+        fills: [{ ...defaultShapeFill }],
         strokes: [],
         cornerRadius: 0,
         effects: [],
@@ -177,7 +184,7 @@ export function createLayer(
     case 'ellipse':
       return {
         ...base,
-        fills: [{ ...defaultFill }],
+        fills: [{ ...defaultShapeFill }],
         strokes: [],
         effects: [],
         arcStartAngle: 0,
