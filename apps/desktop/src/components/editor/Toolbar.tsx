@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { useEditorInteraction } from './EditorInteractionProvider';
 import {
@@ -105,9 +105,17 @@ function FlyoutGroup({
   setOpen: (v: boolean) => void;
   onSelect: (id: CanvasToolId) => void;
 }) {
-  const current =
-    group.tools.find((t) => t.id === activeTool) ?? group.tools[0];
   const isActive = group.tools.some((t) => t.id === activeTool);
+  const [lastPrimitive, setLastPrimitive] = useState<CanvasToolId>(
+    group.tools[0].id,
+  );
+
+  useEffect(() => {
+    if (isActive) setLastPrimitive(activeTool);
+  }, [activeTool, isActive]);
+
+  const current =
+    group.tools.find((t) => t.id === lastPrimitive) ?? group.tools[0];
 
   return (
     <div className="flex items-center gap-[2px]">
