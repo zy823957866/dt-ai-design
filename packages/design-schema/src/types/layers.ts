@@ -1,5 +1,6 @@
 import type { BaseLayer } from './base';
 import type {
+  CornerRadius,
   FillStyle,
   StrokeStyle,
   EffectStyle,
@@ -21,7 +22,7 @@ export interface RectangleLayer extends BaseLayer {
   type: 'rectangle';
   fills: FillStyle[];
   strokes: StrokeStyle[];
-  cornerRadius: number;
+  cornerRadius: CornerRadius;
   effects: EffectStyle[];
 }
 
@@ -61,7 +62,7 @@ export interface ImageLayer extends BaseLayer {
   type: 'image';
   imageSrc: string;
   fitMode: ImageFitMode;
-  cornerRadius: number;
+  cornerRadius: CornerRadius;
   strokes: StrokeStyle[];
   effects: EffectStyle[];
   filters: ImageFilters;
@@ -79,7 +80,7 @@ export interface FrameLayer extends BaseLayer {
   };
   fills: FillStyle[];
   strokes: StrokeStyle[];
-  cornerRadius: number;
+  cornerRadius: CornerRadius;
   effects: EffectStyle[];
   overflow: OverflowMode;
   clipContent: boolean;
