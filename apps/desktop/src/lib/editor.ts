@@ -44,6 +44,12 @@ export interface EditorApi {
   moveLayerBackward: (layerId: string) => void;
   moveLayerToFront: (layerId: string) => void;
   moveLayerToBack: (layerId: string) => void;
+  /** 拖拽重排/改层级：把图层移动到目标父级下的指定索引 */
+  reorderLayer: (
+    layerId: string,
+    targetParentId: string | null,
+    targetIndex: number,
+  ) => void;
 
   // ─── 样式数组（fills/strokes/effects）───
   appendStyleItem: (

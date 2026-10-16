@@ -13,6 +13,7 @@ export {
   moveLayerBackward,
   moveLayerToFront,
   moveLayerToBack,
+  reorderLayer,
   setSelection,
   groupSelection,
   ungroupSelection,

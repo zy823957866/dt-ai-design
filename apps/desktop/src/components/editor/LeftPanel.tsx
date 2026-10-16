@@ -3,6 +3,8 @@ import {
   ChevronDown,
   ChevronRight,
   Eye,
+  EyeOff,
+  Trash2,
   Square,
   Circle,
   Type as TypeIcon,
@@ -54,10 +56,16 @@ interface LeftPanelProps {
 }
 
 interface ContextMenuState {
-  visible: boolean;
   x: number;
   y: number;
   layerId: string;
+}
+
+type DropPosition = 'before' | 'after' | 'inside';
+
+interface DropTarget {
+  id: string;
+  position: DropPosition;
 }
 
 const TABS: Array<{ id: LeftTab; label: string }> = [
@@ -684,17 +692,19 @@ function LayersTab() {
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  const [, setContextMenu] = useState<ContextMenuState>({
-    visible: false,
-    x: 0,
-    y: 0,
-    layerId: '',
-  });
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const dragStateRef = useRef<{
+    sourceId: string | null;
+    target: DropTarget | null;
+  }>({ sourceId: null, target: null });
 
   const doc = editor.getDocument();
   const rootLayerIds = doc.rootLayerIds;
   const allLayers = doc.layers;
+  const searchActive = searchQuery.trim().length > 0;
 
   const filteredRootIds = useMemo(() => {
     if (!searchQuery.trim()) return rootLayerIds;
@@ -713,12 +723,141 @@ function LayersTab() {
     });
   };
 
+  const startRename = (id: string) => {
+    setRenamingId(id);
+    setRenameValue(allLayers[id]?.name || '');
+  };
+
+  const commitRename = () => {
+    if (renamingId) {
+      const next = renameValue.trim();
+      if (next && next !== allLayers[renamingId]?.name) {
+        editor.setLayerProperty(renamingId, 'name', next);
+      }
+    }
+    setRenamingId(null);
+  };
+
+  const toggleVisible = (id: string) => {
+    const layer = allLayers[id];
+    if (layer) editor.setLayerProperty(id, 'visible', !layer.visible);
+  };
+
+  const getParentId = (id: string): string | null => {
+    for (const [pid, layer] of Object.entries(allLayers)) {
+      if (
+        (layer.type === 'frame' || layer.type === 'group') &&
+        (layer as { children: string[] }).children.includes(id)
+      ) {
+        return pid;
+      }
+    }
+    return null;
+  };
+
+  const isDescendant = (ancestorId: string, nodeId: string): boolean => {
+    const stack = [ancestorId];
+    const seen = new Set<string>();
+    while (stack.length > 0) {
+      const id = stack.pop() as string;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const layer = allLayers[id];
+      if (layer && (layer.type === 'frame' || layer.type === 'group')) {
+        for (const child of (layer as { children: string[] }).children) {
+          if (child === nodeId) return true;
+          stack.push(child);
+        }
+      }
+    }
+    return false;
+  };
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setContextMenu(null);
+    setDraggedId(id);
+    dragStateRef.current = { sourceId: id, target: null };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+  };
+
+  const handleDragOver = (e: React.DragEvent, id: string) => {
+    const source = dragStateRef.current.sourceId;
+    if (!source || searchActive) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (id === source || isDescendant(source, id)) {
+      dragStateRef.current.target = null;
+      setDropTarget(null);
+      return;
+    }
+    const layer = allLayers[id];
+    if (!layer) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const ratio = rect.height > 0 ? (e.clientY - rect.top) / rect.height : 0.5;
+    const isContainer = layer.type === 'frame' || layer.type === 'group';
+    let position: DropPosition;
+    if (isContainer) {
+      if (ratio < 0.25) position = 'before';
+      else if (ratio > 0.75) position = 'after';
+      else position = 'inside';
+    } else {
+      position = ratio < 0.5 ? 'before' : 'after';
+    }
+    dragStateRef.current.target = { id, position };
+    setDropTarget({ id, position });
+  };
+
+  const handleDrop = (e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    const source = dragStateRef.current.sourceId;
+    const target = dragStateRef.current.target;
+    dragStateRef.current = { sourceId: null, target: null };
+    setDraggedId(null);
+    setDropTarget(null);
+    if (!source || !target || target.id !== id || source === id) return;
+    if (isDescendant(source, id)) return;
+    const targetLayer = allLayers[id];
+    if (!targetLayer) return;
+
+    if (target.position === 'inside') {
+      const children = (targetLayer as { children: string[] }).children;
+      editor.reorderLayer(source, id, children.length);
+      return;
+    }
+
+    const parentId = getParentId(id);
+    const siblings = parentId
+      ? (allLayers[parentId] as { children: string[] }).children
+      : rootLayerIds;
+    const idx = siblings.indexOf(id);
+    const insertIndex = target.position === 'before' ? idx : idx + 1;
+    editor.reorderLayer(source, parentId, insertIndex);
+  };
+
+  const handleDragEnd = () => {
+    dragStateRef.current = { sourceId: null, target: null };
+    setDraggedId(null);
+    setDropTarget(null);
+  };
+
   useEffect(() => {
     if (renamingId && renameInputRef.current) {
       renameInputRef.current.focus();
       renameInputRef.current.select();
     }
   }, [renamingId]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setContextMenu(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [contextMenu]);
+
+  const contextLayer = contextMenu ? allLayers[contextMenu.layerId] : undefined;
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -736,7 +875,12 @@ function LayersTab() {
         className="flex-1 overflow-y-auto"
         onContextMenu={(e) => {
           e.preventDefault();
-          setContextMenu({ visible: false, x: 0, y: 0, layerId: '' });
+          setContextMenu(null);
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+            setDropTarget(null);
+          }
         }}
       >
         <div className="flex flex-col gap-px">
@@ -755,28 +899,103 @@ function LayersTab() {
               renamingId={renamingId}
               renameValue={renameValue}
               renameInputRef={renameInputRef}
-              onStartRename={(lid) => {
-                setRenamingId(lid);
-                setRenameValue(allLayers[lid]?.name || '');
-              }}
+              onStartRename={startRename}
               onRenameChange={setRenameValue}
-              onCommitRename={() => setRenamingId(null)}
+              onCommitRename={commitRename}
               onCancelRename={() => setRenamingId(null)}
               onContextMenu={(e, lid) => {
                 e.preventDefault();
                 e.stopPropagation();
-                setContextMenu({
-                  visible: true,
-                  x: e.clientX,
-                  y: e.clientY,
-                  layerId: lid,
-                });
+                setContextMenu({ x: e.clientX, y: e.clientY, layerId: lid });
               }}
+              onToggleVisible={toggleVisible}
+              dragEnabled={!searchActive}
+              draggingId={draggedId}
+              dropTarget={dropTarget}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              onDragEnd={handleDragEnd}
             />
           ))}
         </div>
       </div>
+
+      {contextMenu && contextLayer && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setContextMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setContextMenu(null);
+            }}
+          />
+          <div
+            className="fixed z-50 min-w-[148px] overflow-hidden rounded-lg border border-border bg-bg-popover py-1 shadow-popover"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ContextMenuItem
+              icon={<Pencil className="h-3.5 w-3.5" />}
+              label="重命名"
+              onClick={() => {
+                startRename(contextMenu.layerId);
+                setContextMenu(null);
+              }}
+            />
+            <ContextMenuItem
+              icon={
+                contextLayer.visible ? (
+                  <EyeOff className="h-3.5 w-3.5" />
+                ) : (
+                  <Eye className="h-3.5 w-3.5" />
+                )
+              }
+              label={contextLayer.visible ? '隐藏' : '显示'}
+              onClick={() => {
+                toggleVisible(contextMenu.layerId);
+                setContextMenu(null);
+              }}
+            />
+            <div className="my-1 h-px bg-border" />
+            <ContextMenuItem
+              icon={<Trash2 className="h-3.5 w-3.5" />}
+              label="删除"
+              danger
+              onClick={() => {
+                editor.removeLayer([contextMenu.layerId]);
+                setContextMenu(null);
+              }}
+            />
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+function ContextMenuItem({
+  icon,
+  label,
+  onClick,
+  danger,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-bg-hover ${
+        danger ? 'text-red-400' : 'text-text-secondary'
+      }`}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
   );
 }
 
@@ -795,6 +1014,14 @@ interface LayerTreeItemProps {
   onCommitRename: () => void;
   onCancelRename: () => void;
   onContextMenu: (e: React.MouseEvent, id: string) => void;
+  onToggleVisible: (id: string) => void;
+  dragEnabled: boolean;
+  draggingId: string | null;
+  dropTarget: DropTarget | null;
+  onDragStart: (e: React.DragEvent, id: string) => void;
+  onDragOver: (e: React.DragEvent, id: string) => void;
+  onDrop: (e: React.DragEvent, id: string) => void;
+  onDragEnd: () => void;
 }
 
 function LayerTreeItem({
@@ -812,6 +1039,14 @@ function LayerTreeItem({
   onCommitRename,
   onCancelRename,
   onContextMenu,
+  onToggleVisible,
+  dragEnabled,
+  draggingId,
+  dropTarget,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }: LayerTreeItemProps) {
   const editor = useEditor();
   const layer = editor.getDocument().layers[layerId];
@@ -824,18 +1059,38 @@ function LayerTreeItem({
     ? (layer as { children: string[] }).children
     : [];
 
+  const isDragging = draggingId === layerId;
+  const dropPos = dropTarget?.id === layerId ? dropTarget.position : null;
+  const canDrag = dragEnabled && renamingId !== layerId;
+
   return (
     <>
       <div
+        draggable={canDrag}
         onClick={(e) => onSelect(e, layerId)}
         onContextMenu={(e) => onContextMenu(e, layerId)}
+        onDragStart={(e) => onDragStart(e, layerId)}
+        onDragOver={(e) => onDragOver(e, layerId)}
+        onDrop={(e) => onDrop(e, layerId)}
+        onDragEnd={onDragEnd}
         style={{ paddingLeft: depth * 12 + 8 }}
-        className={`group flex h-[26px] cursor-pointer items-center gap-2 rounded-md px-2 ${
+        className={`group relative flex h-[26px] cursor-pointer items-center gap-2 rounded-md px-2 ${
           isSelected
             ? 'bg-accent-soft text-accent-text'
             : 'text-text-primary hover:bg-bg-hover'
+        } ${layer.visible ? '' : 'opacity-50'} ${
+          isDragging ? 'opacity-40' : ''
         }`}
       >
+        {dropPos === 'before' && (
+          <span className="pointer-events-none absolute inset-x-1 top-0 h-[2px] rounded-full bg-accent" />
+        )}
+        {dropPos === 'after' && (
+          <span className="pointer-events-none absolute inset-x-1 bottom-0 h-[2px] rounded-full bg-accent" />
+        )}
+        {dropPos === 'inside' && (
+          <span className="pointer-events-none absolute inset-0 rounded-md border border-accent" />
+        )}
         {isContainer ? (
           <button
             onClick={(e) => {
@@ -881,10 +1136,22 @@ function LayerTreeItem({
           )}
         </div>
         <button
-          onClick={(e) => e.stopPropagation()}
-          className="opacity-0 group-hover:opacity-100"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleVisible(layerId);
+          }}
+          title={layer.visible ? '隐藏图层' : '显示图层'}
+          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded ${
+            layer.visible
+              ? 'text-text-muted opacity-0 group-hover:opacity-100'
+              : 'text-text-secondary opacity-100'
+          }`}
         >
-          <Eye className="h-3 w-3 text-text-muted" />
+          {layer.visible ? (
+            <Eye className="h-3 w-3" />
+          ) : (
+            <EyeOff className="h-3 w-3" />
+          )}
         </button>
       </div>
       {isContainer && !isCollapsed && (
@@ -906,6 +1173,14 @@ function LayerTreeItem({
               onCommitRename={onCommitRename}
               onCancelRename={onCancelRename}
               onContextMenu={onContextMenu}
+              onToggleVisible={onToggleVisible}
+              dragEnabled={dragEnabled}
+              draggingId={draggingId}
+              dropTarget={dropTarget}
+              onDragStart={onDragStart}
+              onDragOver={onDragOver}
+              onDrop={onDrop}
+              onDragEnd={onDragEnd}
             />
           ))}
         </>

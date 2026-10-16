@@ -16,6 +16,7 @@ import {
   ungroupSelection,
   frameSelection,
   duplicateLayer,
+  reorderLayer,
 } from './commands';
 import {
   getSelectedLayers,
@@ -329,6 +330,73 @@ describe('editor-core', () => {
 
       expect(newFrame.children).toHaveLength(1);
       expect(Object.keys(result.document.layers)).toHaveLength(4); // 2 frames + 2 rects
+    });
+  });
+
+  describe('reorderLayer', () => {
+    it('reorders siblings within the same parent', () => {
+      const a = addLayer(state, 'rectangle');
+      state.document = a.document;
+      const idA = a.selection.layerIds[0];
+
+      const b = addLayer(state, 'rectangle');
+      state.document = b.document;
+      const idB = b.selection.layerIds[0];
+
+      const c = addLayer(state, 'rectangle');
+      state.document = c.document;
+      const idC = c.selection.layerIds[0];
+
+      // order: A, B, C -> move C to the front (index 0)
+      const doc = reorderLayer(state, idC, null, 0);
+      expect(doc.rootLayerIds).toEqual([idC, idA, idB]);
+      expect(doc.layers[idC].index).toBe(0);
+      expect(doc.layers[idA].index).toBe(1);
+      expect(doc.layers[idB].index).toBe(2);
+    });
+
+    it('moves a layer after a sibling', () => {
+      const a = addLayer(state, 'rectangle');
+      state.document = a.document;
+      const idA = a.selection.layerIds[0];
+
+      const b = addLayer(state, 'rectangle');
+      state.document = b.document;
+      const idB = b.selection.layerIds[0];
+
+      // order: A, B -> move A after B
+      const doc = reorderLayer(state, idA, null, 2);
+      expect(doc.rootLayerIds).toEqual([idB, idA]);
+    });
+
+    it('reparents a layer into a frame', () => {
+      const frameResult = addLayer(state, 'frame');
+      state.document = frameResult.document;
+      const frameId = frameResult.selection.layerIds[0];
+
+      const rectResult = addLayer(state, 'rectangle');
+      state.document = rectResult.document;
+      const rectId = rectResult.selection.layerIds[0];
+
+      const doc = reorderLayer(state, rectId, frameId, 0);
+      expect(doc.rootLayerIds).toEqual([frameId]);
+      expect((doc.layers[frameId] as FrameLayer).children).toEqual([rectId]);
+      expect(doc.layers[rectId].parentId).toBe(frameId);
+    });
+
+    it('refuses to move a layer into its own descendant', () => {
+      const frameResult = addLayer(state, 'frame');
+      state.document = frameResult.document;
+      const frameId = frameResult.selection.layerIds[0];
+
+      const groupResult = addLayer(state, 'group', undefined, frameId);
+      state.document = groupResult.document;
+      const groupId = groupResult.selection.layerIds[0];
+
+      const doc = reorderLayer(state, frameId, groupId, 0);
+      expect(doc.rootLayerIds).toEqual([frameId]);
+      expect((doc.layers[frameId] as FrameLayer).children).toEqual([groupId]);
+      expect(doc.layers[frameId].parentId).toBeNull();
     });
   });
 

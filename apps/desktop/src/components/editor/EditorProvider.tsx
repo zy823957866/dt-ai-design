@@ -21,6 +21,7 @@ import {
   moveLayerBackward as moveLayerBackwardFn,
   moveLayerToFront as moveLayerToFrontFn,
   moveLayerToBack as moveLayerToBackFn,
+  reorderLayer as reorderLayerFn,
   setSelection,
   selectAll,
   deselectAll,
@@ -491,6 +492,30 @@ export function EditorProvider({
     [notifyChange],
   );
 
+  const handleReorderLayer = useCallback(
+    (layerId: string, targetParentId: string | null, targetIndex: number) => {
+      const prevDoc = stateRef.current.document;
+
+      const cmd = {
+        name: 'reorderLayer',
+
+        execute: (s: EditorState) =>
+          reorderLayerFn(s, layerId, targetParentId, targetIndex),
+
+        undo: (s: EditorState) => {
+          s.document = prevDoc;
+
+          return s.document;
+        },
+      };
+
+      stackRef.current.execute(cmd);
+
+      notifyChange();
+    },
+    [notifyChange],
+  );
+
   // --- duplicate layer handler ---
 
   const handleDuplicateLayer = useCallback(
@@ -919,6 +944,8 @@ export function EditorProvider({
     moveLayerToFront: handleMoveLayerToFront,
 
     moveLayerToBack: handleMoveLayerToBack,
+
+    reorderLayer: handleReorderLayer,
 
     appendStyleItem: handleAppendStyleItem,
 

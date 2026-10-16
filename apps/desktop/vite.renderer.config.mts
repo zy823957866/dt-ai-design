@@ -16,9 +16,26 @@ export default defineConfig({
         __dirname,
         '../../packages/canvas-ruler/src/styles/ruler.css',
       ),
+      // 渲染进程依赖的工作区包一律指向源码，避免读取过期的 dist 缓存
       '@dt-ai-design/canvas-ruler': path.resolve(
         __dirname,
         '../../packages/canvas-ruler/src/index.ts',
+      ),
+      '@dt-ai-design/editor-core': path.resolve(
+        __dirname,
+        '../../packages/editor-core/src/index.ts',
+      ),
+      '@dt-ai-design/editor-interaction': path.resolve(
+        __dirname,
+        '../../packages/editor-interaction/src/index.ts',
+      ),
+      '@dt-ai-design/design-schema': path.resolve(
+        __dirname,
+        '../../packages/design-schema/src/index.ts',
+      ),
+      '@dt-ai-design/agent-provider-core': path.resolve(
+        __dirname,
+        '../../packages/agent-provider-core/src/index.ts',
       ),
     },
   },

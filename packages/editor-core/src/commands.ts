@@ -293,6 +293,64 @@ export function moveLayerToBack(
   return doc;
 }
 
+// ─── 拖拽重排 / 重新归属父级 ────────────────────────────────
+
+/**
+ * 将图层移动到目标父级下的指定索引位置（图层面板拖拽排序/改层级）。
+ *
+ * @param targetParentId 目标父级 ID（null 表示根层级）
+ * @param targetIndex 目标索引，基于「移动前、包含被移动图层」的同级列表计算
+ */
+export function reorderLayer(
+  state: EditorState,
+  layerId: string,
+  targetParentId: string | null,
+  targetIndex: number,
+): DesignDocument {
+  const doc = deepClone(state.document);
+  const layer = doc.layers[layerId];
+  if (!layer) return doc;
+
+  if (targetParentId !== null) {
+    const parent = doc.layers[targetParentId];
+    if (!parent || (parent.type !== 'frame' && parent.type !== 'group')) {
+      return doc;
+    }
+    if (collectLayerIds(doc, layerId).includes(targetParentId)) {
+      return doc;
+    }
+  }
+
+  const currentParentId = findParentId(doc, layerId);
+  const sameParent = currentParentId === targetParentId;
+
+  const currentSiblings = currentParentId
+    ? (doc.layers[currentParentId] as FrameLayer | GroupLayer).children
+    : doc.rootLayerIds;
+  const currentIndex = currentSiblings.indexOf(layerId);
+
+  removeFromParent(doc, layerId);
+
+  let index = targetIndex;
+  if (sameParent && currentIndex !== -1 && currentIndex < targetIndex) {
+    index -= 1;
+  }
+
+  const targetSiblings = targetParentId
+    ? (doc.layers[targetParentId] as FrameLayer | GroupLayer).children
+    : doc.rootLayerIds;
+  const clamped = Math.max(0, Math.min(index, targetSiblings.length));
+  targetSiblings.splice(clamped, 0, layerId);
+
+  layer.parentId = targetParentId;
+  targetSiblings.forEach((id, i) => {
+    const item = doc.layers[id];
+    if (item) item.index = i;
+  });
+
+  return doc;
+}
+
 // ─── 设置选区 ────────────────────────────────────────────────
 
 export function setSelection(
