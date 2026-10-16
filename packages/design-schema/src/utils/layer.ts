@@ -110,6 +110,7 @@ function baseLayerProps(
     parentId: null,
     index: 0,
     blendMode: 'normal',
+    layerPosition: 'auto' as const,
   };
 }
 
