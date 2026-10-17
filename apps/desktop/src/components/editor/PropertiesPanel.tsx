@@ -34,6 +34,16 @@ export function PropertiesPanel({
     };
   }, [editor]);
 
+  const doc = editor.getDocument();
+  const selection = editor.getSelection();
+  const layers = selection.layerIds
+    .map((id) => doc.layers[id])
+    .filter(Boolean) as Layer[];
+
+  if (layers.length === 0) {
+    return null;
+  }
+
   if (collapsed) {
     return (
       <div className="flex w-10 shrink-0 flex-col items-center border-l border-border bg-bg-panel py-2">
@@ -47,11 +57,6 @@ export function PropertiesPanel({
     );
   }
 
-  const doc = editor.getDocument();
-  const selection = editor.getSelection();
-  const layers = selection.layerIds
-    .map((id) => doc.layers[id])
-    .filter(Boolean) as Layer[];
   const ctx: PropertyContextValue = {
     editor,
     layers,

@@ -42,6 +42,7 @@ import type {
   AgentModelInfo,
   AgentTool,
 } from '@dt-ai-design/agent-provider-core';
+import type { DesignDocument, ImageLayer } from '@dt-ai-design/design-schema';
 
 type LeftTab = 'chat' | 'layers' | 'assets' | 'images';
 
@@ -1222,68 +1223,98 @@ function AssetsIcon({
 // Images Tab
 // ============================================================
 
-const GENERATED_IMAGES: Array<{
-  name: string;
-  time: string;
-  color: string;
-  color2: string;
-}> = [
-  { name: 'Dashboard UI', time: '2m ago', color: '#7C3AED', color2: '#A78BFA' },
-  { name: 'Landing Hero', time: '1h ago', color: '#0369A1', color2: '#38BDF8' },
-  {
-    name: 'Mobile App',
-    time: 'yesterday',
-    color: '#0F766E',
-    color2: '#34D399',
-  },
-  { name: 'KPI Cards', time: '2d ago', color: '#BE185D', color2: '#F472B6' },
-  { name: 'Pricing Page', time: '3d ago', color: '#C2410C', color2: '#FB923C' },
-];
+function formatRelativeTime(timestamp: number | undefined): string {
+  if (!timestamp) return '';
+  const diff = Date.now() - timestamp;
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  if (diff < minute) return '刚刚';
+  if (diff < hour) return `${Math.floor(diff / minute)} 分钟前`;
+  if (diff < day) return `${Math.floor(diff / hour)} 小时前`;
+  if (diff < 7 * day) return `${Math.floor(diff / day)} 天前`;
+  const date = new Date(timestamp);
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
 
-function ImagesTab() {
+/** 文档中的顶层图片图层（按 rootLayerIds 顺序）。 */
+export const topLevelImageLayers = (doc: DesignDocument): ImageLayer[] =>
+  doc.rootLayerIds
+    .map((id) => doc.layers[id])
+    .filter((layer): layer is ImageLayer => layer?.type === 'image');
+
+export function ImagesTab() {
+  const editor = useEditor();
+  const [, forceUpdate] = useState(0);
+
+  useEffect(
+    () => editor.subscribe('change', () => forceUpdate((t) => t + 1)),
+    [editor],
+  );
+
+  const doc = editor.getDocument();
+  const images = topLevelImageLayers(doc);
+  const updatedAt = doc.meta?.updatedAt;
+
   return (
     <div className="flex h-full flex-col gap-3.5 overflow-y-auto">
       <div className="flex items-center gap-2 px-1">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
-          Generated Images · {GENERATED_IMAGES.length}
+          Image Layers · {images.length}
         </span>
       </div>
-      <div className="flex flex-col gap-2.5">
-        {GENERATED_IMAGES.map((img) => (
-          <div
-            key={img.name}
-            className="flex flex-col gap-2 rounded-xl border border-border bg-bg-elevated p-2.5"
-          >
-            <div
-              className="flex h-[118px] flex-col overflow-hidden rounded-lg"
-              style={{
-                background: `linear-gradient(135deg, ${img.color}33, ${img.color2}33)`,
-              }}
-            >
-              <div className="flex h-[18px] items-center gap-1.5 bg-black/30 px-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
-                <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
-                <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
-                <span className="ml-1 h-1.5 w-16 rounded-full bg-white/15" />
-              </div>
-              <div className="flex flex-1 flex-col gap-1 p-2">
-                <span className="h-2 w-[70px] rounded bg-white/20" />
-                <span className="h-2 w-[90px] rounded bg-white/15" />
-                <span
-                  className="mt-1 h-[11px] w-[60px] rounded-md"
-                  style={{ backgroundColor: img.color }}
-                />
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-text-primary">
-                {img.name}
-              </span>
-              <span className="text-[10px] text-text-muted">{img.time}</span>
-            </div>
+
+      {images.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-soft">
+            <ImageIcon className="h-4 w-4 text-accent" />
           </div>
-        ))}
-      </div>
+          <p className="text-[12px] text-text-secondary">
+            画布中还没有图片图层
+          </p>
+          <p className="text-[11px] text-text-muted">
+            在画布中添加图片图层后，这里会显示预览。
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {images.map((img) => (
+            <button
+              key={img.id}
+              type="button"
+              onClick={() => editor.setSelection([img.id])}
+              title={img.name}
+              className="flex flex-col gap-2 rounded-xl border border-border bg-bg-elevated p-2.5 text-left transition-colors hover:border-accent"
+            >
+              <div className="flex h-[118px] items-center justify-center overflow-hidden rounded-lg bg-bg-active">
+                {img.imageSrc ? (
+                  <img
+                    src={img.imageSrc}
+                    alt={img.name}
+                    draggable={false}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <ImageIcon className="h-6 w-6 text-text-muted" />
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="min-w-0 truncate text-[11px] font-semibold text-text-primary">
+                  {img.name}
+                </span>
+                <span className="shrink-0 text-[10px] text-text-muted">
+                  {Math.round(img.width)} × {Math.round(img.height)}
+                </span>
+              </div>
+              {updatedAt ? (
+                <span className="text-[10px] text-text-tertiary">
+                  {formatRelativeTime(updatedAt)}
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
