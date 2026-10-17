@@ -147,7 +147,7 @@ export function Canvas() {
   );
 
   const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
+    (e: WheelEvent) => {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
         const delta = e.deltaY > 0 ? -0.1 : 0.1;
@@ -174,6 +174,15 @@ export function Canvas() {
     },
     [editor, viewport],
   );
+
+  // React attaches wheel listeners as passive at the root, so preventDefault()
+  // there is ignored. Register a non-passive native listener on the container.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [handleWheel]);
 
   const computeSmartGuides = useCallback(
     (
@@ -812,7 +821,6 @@ export function Canvas() {
       ref={containerRef}
       className="relative flex-1 overflow-hidden bg-bg-canvas h-full"
       style={{ cursor: getCanvasCursor() }}
-      onWheel={handleWheel}
     >
       {/* Rulers */}
       {showRulers && (
