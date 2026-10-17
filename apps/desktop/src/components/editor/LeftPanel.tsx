@@ -14,8 +14,6 @@ import {
   StickyNote,
   Sparkles,
   Image as ImageIcon,
-  LoaderCircle,
-  X,
   Check,
   Star,
   Heart,
@@ -37,14 +35,13 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useEditor } from '@/lib/editor';
-import { useGeneration } from '@/lib/useGeneration';
-import type { ChatTimelineItem } from '@/lib/useGeneration';
+import { useGenerationController } from '@/lib/generation';
+import { CanvasTimeline } from '@/components/editor/CanvasTimeline';
 import { useAgentModel, AGENT_TOOLS } from '@/lib/useAgentModel';
 import type {
   AgentModelInfo,
   AgentTool,
 } from '@dt-ai-design/agent-provider-core';
-import type { GenerationActivity } from '@/shared/ipc-types';
 
 type LeftTab = 'chat' | 'layers' | 'assets' | 'images';
 
@@ -224,16 +221,6 @@ function ChatHistoryBar() {
 // ============================================================
 // Chat Tab
 // ============================================================
-
-const STAGE_LABELS: Record<string, string> = {
-  planning: '正在规划…',
-  executing: '正在生成设计…',
-  validating: '正在校验文档结构…',
-  repairing: '正在修复校验错误…',
-  completed: '生成完成',
-  failed: '生成失败',
-  cancelled: '已停止',
-};
 
 const MODEL_FALLBACK_LABEL = '默认模型';
 
@@ -435,9 +422,8 @@ function CountStepper({
 }
 
 function ChatTab({ projectId }: { projectId?: string }) {
-  const { items, isRunning, error, start, cancel } = useGeneration({
-    projectId,
-  });
+  void projectId;
+  const { items, isRunning, error, start, cancel } = useGenerationController();
   const {
     tool,
     model,
@@ -450,6 +436,7 @@ function ChatTab({ projectId }: { projectId?: string }) {
   const [input, setInput] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [variantCount, setVariantCount] = useState(3);
+  const [multiAgent, setMultiAgent] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // 时间线更新时滚动到底部
@@ -463,7 +450,7 @@ function ChatTab({ projectId }: { projectId?: string }) {
     const text = input.trim();
     if (!text) return;
     setInput('');
-    void start(text, { tool, model });
+    void start(text, { tool, model, multiAgent });
   };
 
   const toggleExpanded = (id: string) => {
@@ -495,14 +482,11 @@ function ChatTab({ projectId }: { projectId?: string }) {
             </p>
           </div>
         )}
-        {items.map((item) => (
-          <TimelineItemView
-            key={item.id}
-            item={item}
-            expanded={expandedIds.has(item.id)}
-            onToggle={() => toggleExpanded(item.id)}
-          />
-        ))}
+        <CanvasTimeline
+          items={items}
+          expandedIds={expandedIds}
+          onToggle={toggleExpanded}
+        />
         {error && (
           <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11.5px] text-red-400">
             {error}
@@ -529,6 +513,18 @@ function ChatTab({ projectId }: { projectId?: string }) {
         )}
         <div className="mt-2.5 flex items-center gap-2.5">
           <CountStepper count={variantCount} onCountChange={setVariantCount} />
+          <button
+            type="button"
+            onClick={() => setMultiAgent((v) => !v)}
+            className={`flex h-5 items-center rounded-md px-1.5 text-[10px] font-semibold ${
+              multiAgent
+                ? 'bg-accent text-white'
+                : 'bg-bg-active text-text-muted hover:text-text-secondary'
+            }`}
+            title="多智能体并行（区域规划 + 协作者）"
+          >
+            多智能体
+          </button>
           <div className="flex-1" />
           {isRunning ? (
             <button
@@ -571,113 +567,6 @@ function ChatTab({ projectId }: { projectId?: string }) {
           onModelChange={setModel}
         />
       </div>
-    </div>
-  );
-}
-
-function TimelineItemView({
-  item,
-  expanded,
-  onToggle,
-}: {
-  item: ChatTimelineItem;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  switch (item.kind) {
-    case 'user':
-      return (
-        <div className="flex justify-end">
-          <div className="max-w-[80%] rounded-xl bg-accent px-3 py-2 text-[11.5px] text-white">
-            {item.text}
-          </div>
-        </div>
-      );
-    case 'assistant':
-      return (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-accent">
-              <Sparkles className="h-[11px] w-[11px] text-white" />
-            </div>
-            <span className="text-[11px] font-semibold text-text-primary">
-              Assistant
-            </span>
-          </div>
-          <div className="whitespace-pre-wrap rounded-xl bg-bg-elevated px-3 py-2 text-[12.5px] text-text-secondary">
-            {item.text}
-          </div>
-        </div>
-      );
-    case 'activity':
-      return (
-        <ActivityRow
-          activity={item.activity}
-          expanded={expanded}
-          onToggle={onToggle}
-        />
-      );
-    case 'stage':
-      return (
-        <div className="flex items-center gap-2 px-1">
-          {item.spin ? (
-            <LoaderCircle className="h-3 w-3 shrink-0 animate-spin text-text-muted" />
-          ) : (
-            <span className="h-1 w-1 shrink-0 rounded-full bg-text-muted" />
-          )}
-          <span className="text-[11px] text-text-muted">
-            {STAGE_LABELS[item.message] ?? item.message}
-          </span>
-        </div>
-      );
-  }
-}
-
-function ActivityRow({
-  activity,
-  expanded,
-  onToggle,
-}: {
-  activity: GenerationActivity;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  const hasOutput = Boolean(activity.output?.summary || activity.error);
-  return (
-    <div className="rounded-lg border border-border bg-bg-elevated/60">
-      <button
-        onClick={hasOutput ? onToggle : undefined}
-        className={`flex w-full items-start gap-2 px-2.5 py-2 text-left ${
-          hasOutput ? 'cursor-pointer hover:bg-bg-hover' : 'cursor-default'
-        }`}
-      >
-        <span className="mt-[2px] shrink-0">
-          {activity.status === 'running' ? (
-            <LoaderCircle className="h-3 w-3 animate-spin text-accent" />
-          ) : activity.status === 'completed' ? (
-            <Check className="h-3 w-3 text-green-500" />
-          ) : (
-            <X className="h-3 w-3 text-red-400" />
-          )}
-        </span>
-        <span className="min-w-0 flex-1 truncate font-mono text-[10.5px] leading-[16px] text-text-secondary">
-          $ {activity.input.command}
-        </span>
-        {hasOutput && (
-          <ChevronRight
-            className={`mt-[2px] h-3 w-3 shrink-0 text-text-muted transition-transform ${
-              expanded ? 'rotate-90' : ''
-            }`}
-          />
-        )}
-      </button>
-      {expanded && hasOutput && (
-        <div className="border-t border-border px-2.5 py-2">
-          <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap break-all font-mono text-[10px] leading-relaxed text-text-muted">
-            {activity.error ? activity.error.message : activity.output?.summary}
-          </pre>
-        </div>
-      )}
     </div>
   );
 }

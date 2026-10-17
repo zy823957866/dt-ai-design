@@ -5,6 +5,51 @@ export type { ExecutorOptions } from './executor';
 export { Validator } from './validator';
 export type { ValidationResult } from './validator';
 export { buildDocumentPrompt, assembleDocument } from './prompt';
+export {
+  buildAgentsMd,
+  buildCanvasWorkspace,
+  buildCodexMcpArgs,
+  buildDesignRequest,
+  buildHeuristicPlan,
+  buildOpencodeMcpArgs,
+  buildOpencodeMcpConfig,
+  buildPlanPrompt,
+  buildRepairPrompt,
+  buildSchemaMd,
+  buildToolsMd,
+  buildVariablesPrompt,
+  buildVisualCheckPrompt,
+  buildWorkerPrompt,
+  CANVAS_COLLABORATOR_AGENTS,
+  CANVAS_COORDINATOR_AGENT_ID,
+  CANVAS_MAX_PARALLEL_REGIONS,
+  DESIGN_PLAN_SCHEMA,
+  DESIGN_REPAIR_SCHEMA,
+  DESIGN_VARIABLES_SCHEMA,
+  DESIGN_VISUAL_CHECK_SCHEMA,
+  DT_MCP_SERVER_NAME,
+  assignRegionsToAgents,
+  mergePlanIntoAgentsMd,
+  mergeRegionDocument,
+  placeRegionScaffolds,
+  runCanvasAgentSession,
+  variableNamesOf,
+} from './canvas';
+export type {
+  CanvasAgentSessionOptions,
+  CanvasAgentSessionResult,
+  CanvasCollaboratorAgentId,
+  CanvasDesignVariableInput,
+  CanvasGenerationPlan,
+  CanvasRegionAssignment,
+  CanvasRegionPlan,
+  CanvasVisualCheck,
+  CanvasVisualIssue,
+  CanvasWorkspace,
+  McpServerSpec,
+  OpencodeMcpConfig,
+  RegionScaffoldResult,
+} from './canvas';
 
 import type { AgentCommand } from '@dt-ai-design/agent-protocol';
 import { AgentRun, type EventListener } from '@dt-ai-design/agent-runtime';

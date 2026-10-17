@@ -74,18 +74,58 @@ export interface GenerationActivity {
 
 export type GenerationStage =
   | 'planning'
+  | 'editing'
   | 'executing'
+  | 'verifying'
   | 'validating'
   | 'repairing'
   | 'completed'
   | 'failed'
   | 'cancelled';
 
-/** main → renderer 的生成事件流。 */
+export interface GenerationWarning {
+  code: string;
+  message: string;
+  nodeId?: string;
+}
+
+/** 本次运行的智能体（用于画布光标/扫描）。 */
+export interface GenerationAgent {
+  agentId: string;
+  label?: string;
+  color?: string;
+  regionId?: string;
+}
+
+/** main → renderer 的生成事件流（Pencil 式：工具调用/回执 + 文档 + 截图）。 */
 export type GenerationEvent =
   | { type: 'stage'; runId: string; stage: GenerationStage; message?: string }
   | { type: 'activity'; runId: string; activity: GenerationActivity }
+  | { type: 'agents'; runId: string; agents: GenerationAgent[] }
+  | {
+      type: 'tool-call';
+      runId: string;
+      callId: string;
+      tool: string;
+      input: unknown;
+      agentId?: string;
+      regionId?: string;
+    }
+  | {
+      type: 'tool-result';
+      runId: string;
+      callId: string;
+      tool: string;
+      ok: boolean;
+      output?: string[];
+      refs?: Record<string, string>;
+      warnings?: GenerationWarning[];
+      error?: { message: string; editId?: string };
+      agentId?: string;
+      regionId?: string;
+    }
   | { type: 'message'; runId: string; text: string }
+  | { type: 'screenshot'; runId: string; nodeIds: string[]; images?: string[] }
   | {
       type: 'document';
       runId: string;
@@ -105,6 +145,8 @@ export interface GenerationStartInput {
   document: DesignDocument;
   tool: AgentTool;
   model?: string;
+  /** 是否启用多智能体并行（区域规划 + 协作者）。 */
+  multiAgent?: boolean;
 }
 
 export type GenerationStartResult =
@@ -130,7 +172,11 @@ export interface DesktopAPI {
   openProject: (id: string) => Promise<ProjectWithDocument>;
   deleteProject: (id: string) => Promise<void>;
   renameProject: (id: string, name: string) => Promise<void>;
-  saveProject: (id: string, doc: DesignDocument) => Promise<void>;
+  saveProject: (
+    id: string,
+    doc: DesignDocument,
+    thumbnail?: string,
+  ) => Promise<void>;
   importProject: (filePath: string) => Promise<ProjectWithDocument>;
 
   // Settings

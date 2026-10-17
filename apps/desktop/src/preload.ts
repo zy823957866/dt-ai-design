@@ -30,8 +30,8 @@ const api: DesktopAPI = {
   renameProject: (id: string, name: string) =>
     ipcRenderer.invoke(IpcProjectChannel.RENAME, id, name),
 
-  saveProject: (id: string, doc: DesignDocument) =>
-    ipcRenderer.invoke(IpcProjectChannel.SAVE, id, doc),
+  saveProject: (id: string, doc: DesignDocument, thumbnail?: string) =>
+    ipcRenderer.invoke(IpcProjectChannel.SAVE, id, doc, thumbnail),
 
   importProject: (filePath: string) =>
     ipcRenderer.invoke(IpcProjectChannel.IMPORT, filePath),

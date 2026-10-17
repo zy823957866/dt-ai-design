@@ -47,6 +47,7 @@ interface FileCard {
   from: string;
   to: string;
   ageMs: number;
+  thumbnail?: string;
 }
 
 const HOUR = 3600_000;
@@ -187,6 +188,7 @@ export default function DashboardPage() {
           from,
           to,
           ageMs: Date.now() - p.updatedAt,
+          thumbnail: p.thumbnail,
         };
       });
 
@@ -470,12 +472,21 @@ export default function DashboardPage() {
                           }
                           className="group flex cursor-pointer items-center gap-3 border-b border-border px-4 py-2.5 last:border-b-0 hover:bg-bg-hover"
                         >
-                          <span
-                            className="h-8 w-8 shrink-0 rounded-md"
-                            style={{
-                              background: `linear-gradient(135deg, ${file.from}, ${file.to})`,
-                            }}
-                          />
+                          {file.thumbnail ? (
+                            <img
+                              src={file.thumbnail}
+                              alt={file.name}
+                              draggable={false}
+                              className="h-8 w-8 shrink-0 rounded-md object-contain ring-1 ring-border"
+                            />
+                          ) : (
+                            <span
+                              className="h-8 w-8 shrink-0 rounded-md"
+                              style={{
+                                background: `linear-gradient(135deg, ${file.from}, ${file.to})`,
+                              }}
+                            />
+                          )}
                           <div className="flex-1">
                             {renamingId === file.id ? (
                               <input
@@ -725,13 +736,25 @@ function FileCardView({
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      <button onClick={onOpen} className="flex-1 w-full min-h-0">
-        <span
-          className="block h-full w-full"
-          style={{
-            background: `linear-gradient(135deg, ${file.from}, ${file.to})`,
-          }}
-        />
+      <button
+        onClick={onOpen}
+        className="flex-1 w-full min-h-0 overflow-hidden bg-[#f5f7fa]"
+      >
+        {file.thumbnail ? (
+          <img
+            src={file.thumbnail}
+            alt={file.name}
+            draggable={false}
+            className="h-full w-full object-contain"
+          />
+        ) : (
+          <span
+            className="block h-full w-full"
+            style={{
+              background: `linear-gradient(135deg, ${file.from}, ${file.to})`,
+            }}
+          />
+        )}
       </button>
       <div className="flex flex-col gap-[3px] p-2.5">
         {renaming ? (

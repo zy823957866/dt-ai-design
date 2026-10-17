@@ -1,7 +1,13 @@
 ﻿import type {
+  AgentAgentsPayload,
+  AgentDocumentPayload,
   AgentEvent,
+  AgentMessagePayload,
+  AgentScreenshotPayload,
   AgentState,
   AgentStage,
+  AgentToolCallPayload,
+  AgentToolResultPayload,
 } from '@dt-ai-design/agent-protocol';
 
 export type EventListener = (event: AgentEvent) => void;
@@ -16,6 +22,7 @@ export class AgentRun {
   private state: AgentState;
   private listeners = new Set<EventListener>();
   private seq = 0;
+  private revision = 0;
   private cancelled = false;
   private cancelCallbacks: Array<() => void> = [];
 
@@ -129,6 +136,42 @@ export class AgentRun {
   /** 在事件总线上声明一个 plan 事件（规划产物）。 */
   setPlan(payload: unknown): void {
     this.emit({ type: 'agent:plan', payload });
+  }
+
+  /** 递增并返回文档版本号（每次工具产生文档变更时调用）。 */
+  nextRevision(): number {
+    return ++this.revision;
+  }
+
+  /** 助手文本消息。 */
+  emitMessage(text: string): void {
+    const payload: AgentMessagePayload = { text };
+    this.emit({ type: 'agent:message', payload });
+  }
+
+  /** 声明本次运行的智能体（含多智能体区域），供画布光标/扫描使用。 */
+  emitAgents(payload: AgentAgentsPayload): void {
+    this.emit({ type: 'agent:agents', payload });
+  }
+
+  /** 工具调用（Pencil 式：通常是 execute 片段）。 */
+  emitToolCall(payload: AgentToolCallPayload): void {
+    this.emit({ type: 'agent:tool-call', payload });
+  }
+
+  /** 工具回执（refs / warnings / Print 输出 / 错误）。 */
+  emitToolResult(payload: AgentToolResultPayload): void {
+    this.emit({ type: 'agent:tool-result', payload });
+  }
+
+  /** 文档变更事件。 */
+  emitDocument(payload: AgentDocumentPayload): void {
+    this.emit({ type: 'agent:document', payload });
+  }
+
+  /** 截图事件。 */
+  emitScreenshot(payload: AgentScreenshotPayload): void {
+    this.emit({ type: 'agent:screenshot', payload });
   }
 
   /** 启动 run，发送 started 事件并进入 planning 阶段。 */

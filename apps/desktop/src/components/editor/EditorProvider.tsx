@@ -58,6 +58,8 @@ import type {
 } from '@dt-ai-design/design-schema';
 
 import { EditorContext, type EditorApi } from '@/lib/editor';
+import { normalizeTextSizes } from '@/lib/textMetrics';
+import { documentThumbnailDataUrl } from '@/lib/thumbnail';
 
 interface EditorProviderProps {
   children: ReactNode;
@@ -86,7 +88,13 @@ export function EditorProvider({
   initialDocument,
   projectId,
 }: EditorProviderProps) {
-  const stateRef = useRef<EditorState>(createEditorState(initialDocument));
+  const stateRef = useRef<EditorState>(
+    createEditorState(
+      initialDocument
+        ? normalizeTextSizes(initialDocument).document
+        : undefined,
+    ),
+  );
 
   const stackRef = useRef<CommandStack>(new CommandStack(stateRef.current));
 
@@ -825,9 +833,11 @@ export function EditorProvider({
       saveTimeout = setTimeout(() => {
         const doc = stateRef.current.document;
 
-        window.desktopAPI.saveProject(projectId, doc).catch((err) => {
-          console.error('Auto-save failed:', err);
-        });
+        window.desktopAPI
+          .saveProject(projectId, doc, documentThumbnailDataUrl(doc))
+          .catch((err) => {
+            console.error('Auto-save failed:', err);
+          });
       }, 2000);
     });
 

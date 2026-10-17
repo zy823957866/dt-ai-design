@@ -1,8 +1,10 @@
+import { applyTextHug } from '@/lib/textMetrics';
+import type { TextLayer } from '@dt-ai-design/design-schema';
+
 import { NumberField } from '../controls/NumberField';
 import { SectionHeader } from '../controls/SectionHeader';
 import { SegmentedControl } from '../controls/SegmentedControl';
 import type { PropertySection, PropertyContextValue } from '../PropertySection';
-import type { TextLayer } from '@dt-ai-design/design-schema';
 
 const H_ALIGN = [
   { value: 'left' as const, label: 'Left' },
@@ -27,13 +29,17 @@ function TypographyPanel({ ctx }: { ctx: PropertyContextValue }) {
   const t = layer as TextLayer;
   const set = (key: string, value: unknown) =>
     editor.setLayerProperty(t.id, key, value);
+  const setAndHug = (key: string, value: unknown) => {
+    editor.setLayerProperty(t.id, key, value);
+    applyTextHug(editor, t.id);
+  };
 
   return (
     <>
       <SectionHeader label="Typography" />
       <textarea
         value={t.content}
-        onChange={(e) => set('content', e.target.value)}
+        onChange={(e) => setAndHug('content', e.target.value)}
         rows={2}
         placeholder="Text"
         className="mb-2 w-full resize-none rounded-md border border-border bg-bg-input px-2 py-1.5 text-xs text-text-primary outline-none focus:border-accent"
@@ -43,27 +49,27 @@ function TypographyPanel({ ctx }: { ctx: PropertyContextValue }) {
           label="Size"
           min={0}
           value={t.fontSize}
-          onCommit={(v) => set('fontSize', v)}
+          onCommit={(v) => setAndHug('fontSize', v)}
         />
         <NumberField
           label="Weight"
           min={100}
           max={900}
           value={t.fontWeight}
-          onCommit={(v) => set('fontWeight', v)}
+          onCommit={(v) => setAndHug('fontWeight', v)}
         />
         <NumberField
           label="Line"
           suffix="%"
           min={0}
           value={Math.round((t.lineHeight / t.fontSize) * 100)}
-          onCommit={(v) => set('lineHeight', (v / 100) * t.fontSize)}
+          onCommit={(v) => setAndHug('lineHeight', (v / 100) * t.fontSize)}
         />
         <NumberField
           label="LS"
           suffix="px"
           value={t.letterSpacing}
-          onCommit={(v) => set('letterSpacing', v)}
+          onCommit={(v) => setAndHug('letterSpacing', v)}
         />
       </div>
       <div className="mt-2">

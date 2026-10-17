@@ -1,6 +1,13 @@
 /** Agent 运行阶段（协议层契约）。 */
 export type AgentStage =
-  'idle' | 'planning' | 'executing' | 'validating' | 'completed' | 'failed';
+  | 'idle'
+  | 'planning'
+  | 'editing'
+  | 'executing'
+  | 'verifying'
+  | 'validating'
+  | 'completed'
+  | 'failed';
 
 export interface AgentState {
   sessionId: string;

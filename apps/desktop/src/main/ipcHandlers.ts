@@ -12,18 +12,18 @@ import {
 import type { AgentTool } from '@dt-ai-design/agent-provider-core';
 import * as projectStore from './projectStore';
 import * as settingsStore from './settings';
-import { GenerationRuntime } from './generationRuntime';
+import { CanvasAgentRuntime } from './canvasAgentRuntime';
 import { toolRegistry, resolveToolCommand } from './toolRegistry';
 import type { DesignDocument } from '@dt-ai-design/design-schema';
 
-let generationRuntime: GenerationRuntime | null = null;
+let canvasAgentRuntime: CanvasAgentRuntime | null = null;
 
-/** 懒创建生成运行时（首次调用时 app 已 ready）。 */
-function getGenerationRuntime(): GenerationRuntime {
-  if (!generationRuntime) {
-    generationRuntime = new GenerationRuntime({ app });
+/** 懒创建画布智能体运行时（首次调用时 app 已 ready）。 */
+function getCanvasAgentRuntime(): CanvasAgentRuntime {
+  if (!canvasAgentRuntime) {
+    canvasAgentRuntime = new CanvasAgentRuntime({ app });
   }
-  return generationRuntime;
+  return canvasAgentRuntime;
 }
 
 /**
@@ -57,8 +57,8 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     IpcProjectChannel.SAVE,
-    async (_event, id: string, doc: DesignDocument) => {
-      await projectStore.saveProject(id, doc);
+    async (_event, id: string, doc: DesignDocument, thumbnail?: string) => {
+      await projectStore.saveProject(id, doc, thumbnail);
     },
   );
 
@@ -134,18 +134,18 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IpcGenerationChannel.START,
     async (event, input: GenerationStartInput) => {
-      return getGenerationRuntime().start(event.sender, input);
+      return getCanvasAgentRuntime().start(event.sender, input);
     },
   );
 
   ipcMain.handle(IpcGenerationChannel.CANCEL, async (_event, runId: string) => {
-    getGenerationRuntime().cancel(runId);
+    getCanvasAgentRuntime().cancel(runId);
   });
 
   ipcMain.handle(
     IpcGenerationChannel.RESET,
     async (_event, projectId: string) => {
-      getGenerationRuntime().resetThread(projectId);
+      getCanvasAgentRuntime().resetThread(projectId);
     },
   );
 }

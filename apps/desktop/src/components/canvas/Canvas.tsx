@@ -1,6 +1,7 @@
 import './canvas-ruler.css';
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useEditor } from '@/lib/editor';
+import { applyTextHug } from '@/lib/textMetrics';
 import { useEditorInteraction } from '@/components/editor/EditorInteractionProvider';
 import {
   CanvasRuler,
@@ -13,6 +14,7 @@ import type {
 } from '@dt-ai-design/editor-interaction';
 import { CanvasDocumentRenderer } from './CanvasDocumentRenderer';
 import { CanvasCreationOverlay } from './CanvasCreationOverlay';
+import { CanvasAgentOverlay } from './CanvasAgentOverlay';
 import { ViewportSelectionOverlay } from './ViewportSelectionOverlay';
 import type {
   Layer,
@@ -508,6 +510,7 @@ export function Canvas() {
           width: 160,
           height: 24,
           content: '',
+          sizing: 'autoWidth',
           fills: [{ type: 'solid', color: '#000000', opacity: 1 }],
         });
         const newId = editor.getSelection().layerIds[0];
@@ -676,6 +679,7 @@ export function Canvas() {
       const textarea = textareaRef.current;
       if (!cancel && textarea) {
         editor.setLayerProperty(editingTextId, 'content', textarea.value);
+        applyTextHug(editor, editingTextId);
       }
       setEditingTextId(null);
     },
@@ -970,6 +974,14 @@ export function Canvas() {
             })()}
         </g>
       </svg>
+
+      {/* AI generation overlay: agent cursor(s) + region scan (screen-space) */}
+      <CanvasAgentOverlay
+        zoom={viewport.zoom}
+        panX={viewport.panX}
+        panY={viewport.panY}
+        offset={canvasOffset}
+      />
 
       {/* Hover highlight (screen-space) */}
       {hoveredId &&

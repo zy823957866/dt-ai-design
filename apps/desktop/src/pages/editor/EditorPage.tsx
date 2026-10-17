@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { EditorProvider } from '@/components/editor/EditorProvider';
 import { EditorInteractionProvider } from '@/components/editor/EditorInteractionProvider';
+import { GenerationProvider } from '@/lib/generation';
 import { TitleBar } from '@/components/editor/TitleBar';
 import { LeftPanel } from '@/components/editor/LeftPanel';
 import { PropertiesPanel } from '@/components/editor/PropertiesPanel';
@@ -12,6 +13,7 @@ import {
   type OverlayName,
 } from '@/components/overlays/OverlayHost';
 import { useEditor } from '@/lib/editor';
+import { documentThumbnailDataUrl } from '@/lib/thumbnail';
 import { createDocument } from '@dt-ai-design/design-schema';
 import type { DesignDocument } from '@dt-ai-design/design-schema';
 import type { ProjectWithDocument } from '@/shared/ipc-types';
@@ -59,45 +61,47 @@ export default function EditorPage() {
 
   return (
     <EditorProvider initialDocument={initialDoc} projectId={project?.id}>
-      <EditorInteractionProvider>
-        <div className="flex h-screen w-full flex-col overflow-hidden bg-bg-canvas text-text-primary">
-          <EditorTitleBar
-            projectName={documentName}
-            fileId={fileId}
-            onBack={() => navigate('/dashboard')}
-            onExport={() => setOverlay('export')}
-            onOpenSettings={() => setOverlay('settings')}
-          />
-
-          <div className="flex flex-1 overflow-hidden">
-            <LeftPanel
-              collapsed={leftCollapsed}
-              onCollapse={() => setLeftCollapsed(true)}
-              onExpand={() => setLeftCollapsed(false)}
-              projectId={project?.id}
+      <GenerationProvider projectId={project?.id}>
+        <EditorInteractionProvider>
+          <div className="flex h-screen w-full flex-col overflow-hidden bg-bg-canvas text-text-primary">
+            <EditorTitleBar
+              projectName={documentName}
+              fileId={fileId}
+              onBack={() => navigate('/dashboard')}
+              onExport={() => setOverlay('export')}
+              onOpenSettings={() => setOverlay('settings')}
             />
 
-            <div className="relative flex flex-1 overflow-hidden">
-              <EditorCanvasStage />
+            <div className="flex flex-1 overflow-hidden">
+              <LeftPanel
+                collapsed={leftCollapsed}
+                onCollapse={() => setLeftCollapsed(true)}
+                onExpand={() => setLeftCollapsed(false)}
+                projectId={project?.id}
+              />
+
+              <div className="relative flex flex-1 overflow-hidden">
+                <EditorCanvasStage />
+              </div>
+
+              <PropertiesPanel
+                collapsed={rightCollapsed}
+                onCollapse={() => setRightCollapsed(true)}
+                onExpand={() => setRightCollapsed(false)}
+                onOpenColor={() => setOverlay('color')}
+              />
             </div>
 
-            <PropertiesPanel
-              collapsed={rightCollapsed}
-              onCollapse={() => setRightCollapsed(true)}
-              onExpand={() => setRightCollapsed(false)}
-              onOpenColor={() => setOverlay('color')}
+            <StatusBar />
+            <InitialSelection id="frame-landing" />
+            <OverlayHost
+              panel={overlay}
+              onOpen={setOverlay}
+              onClose={() => setOverlay(null)}
             />
           </div>
-
-          <StatusBar />
-          <InitialSelection id="frame-landing" />
-          <OverlayHost
-            panel={overlay}
-            onOpen={setOverlay}
-            onClose={() => setOverlay(null)}
-          />
-        </div>
-      </EditorInteractionProvider>
+        </EditorInteractionProvider>
+      </GenerationProvider>
     </EditorProvider>
   );
 }
@@ -124,7 +128,11 @@ function EditorTitleBar({
     try {
       const doc = editor.getDocument();
       if (fileId !== 'new') {
-        await window.desktopAPI.saveProject(fileId, doc);
+        await window.desktopAPI.saveProject(
+          fileId,
+          doc,
+          documentThumbnailDataUrl(doc),
+        );
       }
     } catch (err) {
       console.error('Save failed:', err);

@@ -39,6 +39,8 @@ export interface AgentExecRequest {
   conversation?: AgentConversation;
   access?: AgentAccess;
   responseFormat?: 'text' | 'json';
+  /** 附加 CLI 参数（如 MCP 配置注入的 -c 覆盖）。 */
+  extraArgs?: string[];
   signal?: AbortSignal;
   onEvent?: (event: AgentExecEvent) => void;
 }

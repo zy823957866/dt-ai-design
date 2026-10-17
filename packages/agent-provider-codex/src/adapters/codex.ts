@@ -61,6 +61,7 @@ export class CodexProvider implements AgentProvider {
     const args = ['exec'];
     if (conversation.type === 'resume') args.push('resume');
     args.push('--json', '--skip-git-repo-check');
+    if (request.extraArgs?.length) args.push(...request.extraArgs);
     // resume 子命令不支持 --sandbox 标志，需用 config 覆盖
     if (conversation.type === 'resume') {
       args.push('-c', `sandbox_mode="${sandbox}"`);

@@ -300,15 +300,17 @@ function FrameLayerNode({
           />
         );
       })}
-      <text
-        x={layer.x + 4}
-        y={layer.y - 6}
-        fontSize={11}
-        fill="#6b7280"
-        fontFamily="var(--font-sans)"
-      >
-        {layer.name}
-      </text>
+      {layer.type === 'frame' && layer.parentId === null && layer.name ? (
+        <text
+          x={layer.x + 4}
+          y={layer.y - 6}
+          fontSize={11}
+          fill="#6b7280"
+          fontFamily="var(--font-sans)"
+        >
+          {layer.name}
+        </text>
+      ) : null}
     </g>
   );
 }

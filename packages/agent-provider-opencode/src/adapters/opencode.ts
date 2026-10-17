@@ -59,6 +59,7 @@ export class OpenCodeProvider implements AgentProvider {
     const allowWrite = (request.access ?? 'workspace-write') !== 'read-only';
 
     const args = ['run', '--format', 'json', '--standalone'];
+    if (request.extraArgs?.length) args.push(...request.extraArgs);
     if (request.model) args.push('--model', request.model);
     if (conversation.type === 'resume') args.push('--session', conversation.id);
     if (allowWrite) args.push('--auto');
