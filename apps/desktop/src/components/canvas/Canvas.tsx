@@ -1,6 +1,7 @@
 import './canvas-ruler.css';
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useEditor } from '@/lib/editor';
+import { applyTextHug } from '@/lib/textMetrics';
 import { useEditorInteraction } from '@/components/editor/EditorInteractionProvider';
 import {
   CanvasRuler,
@@ -13,6 +14,7 @@ import type {
 } from '@dt-ai-design/editor-interaction';
 import { CanvasDocumentRenderer } from './CanvasDocumentRenderer';
 import { CanvasCreationOverlay } from './CanvasCreationOverlay';
+import { CanvasAgentOverlay } from './CanvasAgentOverlay';
 import { ViewportSelectionOverlay } from './ViewportSelectionOverlay';
 import type {
   Layer,
@@ -48,8 +50,12 @@ function textAlignToAnchor(
 
 export function Canvas() {
   const editor = useEditor();
-  const { state: interactionState, dispatch: interactionDispatch } =
-    useEditorInteraction();
+  const { interaction, state: interactionState } = useEditorInteraction();
+  const interactionDispatch = useCallback(
+    (event: Parameters<typeof interaction.dispatch>[0]) =>
+      interaction.dispatch(event),
+    [interaction],
+  );
 
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -88,6 +94,7 @@ export function Canvas() {
 
   const activeTool = interactionState.activeTool;
   const interactionMode = interactionState.mode;
+  const isSpacePressed = interactionState.isSpacePressed;
   const creationBounds = interactionState.creationBounds;
   const marqueeBounds = interactionState.marqueeBounds;
 
@@ -140,7 +147,7 @@ export function Canvas() {
   );
 
   const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
+    (e: WheelEvent) => {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
         const delta = e.deltaY > 0 ? -0.1 : 0.1;
@@ -167,6 +174,15 @@ export function Canvas() {
     },
     [editor, viewport],
   );
+
+  // React attaches wheel listeners as passive at the root, so preventDefault()
+  // there is ignored. Register a non-passive native listener on the container.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [handleWheel]);
 
   const computeSmartGuides = useCallback(
     (
@@ -337,19 +353,9 @@ export function Canvas() {
           case 'endPan':
             break;
           case 'pan':
-            editor.pan(cmd.dx * viewport.zoom, cmd.dy * viewport.zoom);
+            // dx/dy 已是屏幕像素增量，与 handleMouseMove 的平移拦截路径一致
+            editor.pan(cmd.dx, cmd.dy);
             break;
-          case 'createLayer': {
-            const w = Math.max(cmd.bounds.width, 1);
-            const h = Math.max(cmd.bounds.height, 1);
-            editor.addLayer(cmd.layerType, {
-              x: cmd.bounds.x,
-              y: cmd.bounds.y,
-              width: w,
-              height: h,
-            });
-            break;
-          }
           case 'moveLayer': {
             for (const id of cmd.layerIds) {
               const layer = doc.layers[id];
@@ -437,12 +443,23 @@ export function Canvas() {
           case 'updateCreationOverlay':
           case 'clearCreationOverlay':
             break;
+          case 'createLayer': {
+            const w = Math.max(cmd.bounds.width, 1);
+            const h = Math.max(cmd.bounds.height, 1);
+            editor.addLayer(cmd.layerType, {
+              x: cmd.bounds.x,
+              y: cmd.bounds.y,
+              width: w,
+              height: h,
+            });
+            break;
+          }
           default:
             break;
         }
       }
     },
-    [editor, doc, viewport.zoom, computeSmartGuides],
+    [editor, doc, computeSmartGuides],
   );
   // ─── Pointer event handlers (delegated to interaction state machine) ───
   const handleMouseDown = useCallback(
@@ -493,10 +510,39 @@ export function Canvas() {
 
       if (e.button !== 0) return;
 
+      // 文字工具：点击创建空的文字图层并进入内联编辑
+      if (activeTool === 'text') {
+        e.preventDefault();
+        editor.addLayer('text', {
+          x: canvasPos.x,
+          y: canvasPos.y,
+          width: 160,
+          height: 24,
+          content: '',
+          sizing: 'autoWidth',
+          fills: [{ type: 'solid', color: '#000000', opacity: 1 }],
+        });
+        const newId = editor.getSelection().layerIds[0];
+        if (newId) setEditingTextId(newId);
+        editor.setActiveTool('move');
+        interactionDispatch({ type: 'selectTool', tool: 'move' });
+        return;
+      }
+
       const hit = hitTestAtPoint(canvasPos.x, canvasPos.y);
 
+      // 手型工具 / 空格拖拽会进入平移模式：平移全程使用屏幕坐标（与 pointerMove 的
+      // panning 分支一致），若此处传世界坐标，首次移动会算出 clientX - worldX 的巨
+      // 大增量，导致画布内容瞬间飞向右下角
+      const willPan = activeTool === 'hand' || isSpacePressed;
+
       // Save initial positions for move/smart guides
-      if (activeTool === 'select' && hit.type === 'layer' && !e.shiftKey) {
+      if (
+        activeTool === 'move' &&
+        hit.type === 'layer' &&
+        !e.shiftKey &&
+        !willPan
+      ) {
         const alreadySelected = selection.layerIds.includes(hit.layerId);
         const selIds = alreadySelected ? selection.layerIds : [hit.layerId];
         initialDragPositionsRef.current = new Map();
@@ -504,13 +550,13 @@ export function Canvas() {
           const l = doc.layers[id];
           if (l) initialDragPositionsRef.current.set(id, { x: l.x, y: l.y });
         }
-      } else if (activeTool === 'select' && hit.type === 'empty') {
+      } else if (activeTool === 'move' && hit.type === 'empty' && !willPan) {
         marqueeInitialRef.current = e.shiftKey ? [...selection.layerIds] : [];
       }
 
       const commands = interactionDispatch({
         type: 'pointerDown',
-        point: canvasPos,
+        point: willPan ? { x: e.clientX, y: e.clientY } : canvasPos,
         hit,
         shiftKey: e.shiftKey,
         metaKey: e.metaKey || e.ctrlKey,
@@ -522,6 +568,7 @@ export function Canvas() {
       editor,
       viewport,
       activeTool,
+      isSpacePressed,
       selection.layerIds,
       screenToCanvas,
       hitTestAtPoint,
@@ -607,7 +654,7 @@ export function Canvas() {
   const handleResizeStart = useCallback(
     (e: React.MouseEvent, handle: string, layerId: string) => {
       e.stopPropagation();
-      if (activeTool !== 'select') return;
+      if (activeTool !== 'move') return;
       const layer = doc.layers[layerId];
       if (!layer) return;
       const canvasPos = screenToCanvas(e.clientX, e.clientY);
@@ -641,6 +688,7 @@ export function Canvas() {
       const textarea = textareaRef.current;
       if (!cancel && textarea) {
         editor.setLayerProperty(editingTextId, 'content', textarea.value);
+        applyTextHug(editor, editingTextId);
       }
       setEditingTextId(null);
     },
@@ -653,6 +701,64 @@ export function Canvas() {
       textareaRef.current.select();
     }
   }, [editingTextId]);
+
+  // 键盘：Ctrl+= / Ctrl+- / Ctrl+0 控制画布缩放（应用菜单已移除 zoom role）
+  const zoomAtCenter = useCallback(
+    (factor: number) => {
+      const rect = svgRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const newZoom = Math.min(Math.max(viewport.zoom * (1 + factor), 0.1), 16);
+      if (newZoom === viewport.zoom) return;
+      const zoomRatio = newZoom / viewport.zoom;
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+      editor.setViewport({
+        zoom: newZoom,
+        panX: cx - (cx - viewport.panX) * zoomRatio,
+        panY: cy - (cy - viewport.panY) * zoomRatio,
+      });
+    },
+    [editor, viewport],
+  );
+
+  const resetZoomAtCenter = useCallback(() => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    editor.setViewport({
+      zoom: 1,
+      panX: cx - (cx - viewport.panX) / viewport.zoom,
+      panY: cy - (cy - viewport.panY) / viewport.zoom,
+    });
+  }, [editor, viewport]);
+
+  useEffect(() => {
+    const handleZoomKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      const key = e.key;
+      if (key === '=' || key === '+') {
+        e.preventDefault();
+        zoomAtCenter(0.1);
+      } else if (key === '-' || key === '_') {
+        e.preventDefault();
+        zoomAtCenter(-0.1);
+      } else if (key === '0') {
+        e.preventDefault();
+        resetZoomAtCenter();
+      }
+    };
+    window.addEventListener('keydown', handleZoomKeyDown);
+    return () => window.removeEventListener('keydown', handleZoomKeyDown);
+  }, [zoomAtCenter, resetZoomAtCenter]);
 
   // Keyboard: space bar for panning
   useEffect(() => {
@@ -702,7 +808,11 @@ export function Canvas() {
     if (interactionMode === 'panning') return 'grabbing';
     if (activeTool === 'hand' || interactionState.isSpacePressed) return 'grab';
     if (activeTool === 'zoom') return 'zoom-in';
-    if (['rectangle', 'ellipse', 'frame', 'triangle'].includes(activeTool))
+    if (
+      ['rectangle', 'ellipse', 'polygon', 'frame', 'browser'].includes(
+        activeTool,
+      )
+    )
       return 'crosshair';
     return 'default';
   };
@@ -711,7 +821,6 @@ export function Canvas() {
       ref={containerRef}
       className="relative flex-1 overflow-hidden bg-bg-canvas h-full"
       style={{ cursor: getCanvasCursor() }}
-      onWheel={handleWheel}
     >
       {/* Rulers */}
       {showRulers && (
@@ -799,6 +908,7 @@ export function Canvas() {
             doc={doc}
             selectedIds={selection.layerIds}
             hoveredId={hoveredId}
+            editingTextId={editingTextId}
             onLayerClick={() => {}}
             onLayerDoubleClick={handleTextDoubleClick}
             onLayerEnter={handleLayerEnter}
@@ -873,6 +983,14 @@ export function Canvas() {
         </g>
       </svg>
 
+      {/* AI generation overlay: agent cursor(s) + region scan (screen-space) */}
+      <CanvasAgentOverlay
+        zoom={viewport.zoom}
+        panX={viewport.panX}
+        panY={viewport.panY}
+        offset={canvasOffset}
+      />
+
       {/* Hover highlight (screen-space) */}
       {hoveredId &&
         !selection.layerIds.includes(hoveredId) &&
@@ -925,6 +1043,7 @@ export function Canvas() {
       <ViewportSelectionOverlay
         layers={
           selection.layerIds
+            .filter((id) => id !== editingTextId)
             .map((id) => doc.layers[id])
             .filter(Boolean) as Layer[]
         }
@@ -932,7 +1051,7 @@ export function Canvas() {
         panY={viewport.panY + canvasOffset}
         zoom={viewport.zoom}
         showHandles={
-          activeTool === 'select' &&
+          activeTool === 'move' &&
           selection.layerIds.length === 1 &&
           interactionMode === 'idle'
         }
@@ -979,6 +1098,7 @@ export function Canvas() {
             <textarea
               ref={textareaRef}
               defaultValue={textLayer.content || ''}
+              onMouseDown={(e) => e.stopPropagation()}
               onBlur={() => finishTextEditing(false)}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
@@ -1004,13 +1124,13 @@ export function Canvas() {
                 fontSize: textLayer.fontSize * viewport.zoom + 'px',
                 fontWeight: textLayer.fontWeight,
                 fontFamily: textLayer.fontFamily || 'var(--font-sans)',
-                color: fill?.color || '#e4e4e7',
+                color: fill?.color || '#000000',
                 textAlign: textAlignStyle,
                 letterSpacing: textLayer.letterSpacing
                   ? textLayer.letterSpacing * viewport.zoom + 'px'
                   : undefined,
                 background: 'transparent',
-                border: '1px solid #8b5cf6',
+                border: 'none',
                 outline: 'none',
                 padding: '0',
                 margin: '0',

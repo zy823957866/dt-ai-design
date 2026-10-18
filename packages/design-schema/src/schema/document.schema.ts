@@ -1,5 +1,6 @@
 ﻿import { z } from 'zod';
 import { layerSchema } from './layers.schema';
+import { normalizeDocument } from '../utils/migrate';
 import type { DesignDocument } from '../types';
 
 const designVariableSchema = z.object({
@@ -46,8 +47,9 @@ export const documentSchema = z.object({
 export function validateDocument(doc: unknown): {
   success: boolean;
   errors: string[];
+  data?: DesignDocument;
 } {
-  const result = documentSchema.safeParse(doc);
+  const result = documentSchema.safeParse(normalizeDocument(doc));
   if (!result.success) {
     const errors = result.error.issues.map(
       (issue) => `${issue.path.join('.')}: ${issue.message}`,
@@ -89,5 +91,9 @@ export function validateDocument(doc: unknown): {
     }
   }
 
-  return { success: errors.length === 0, errors };
+  return {
+    success: errors.length === 0,
+    errors,
+    data: errors.length === 0 ? parsed : undefined,
+  };
 }

@@ -4,10 +4,13 @@ import {
   IpcSettingsChannel,
   IpcAppChannel,
   IpcGenerationChannel,
+  IpcAgentChannel,
   type DesktopAPI,
   type OpenDialogOptions,
   type SaveDialogOptions,
-  type GenerationProgress,
+  type GenerationEvent,
+  type GenerationStartInput,
+  type AgentTool,
 } from './shared/ipc-types';
 import type { DesignDocument } from '@dt-ai-design/design-schema';
 
@@ -27,8 +30,8 @@ const api: DesktopAPI = {
   renameProject: (id: string, name: string) =>
     ipcRenderer.invoke(IpcProjectChannel.RENAME, id, name),
 
-  saveProject: (id: string, doc: DesignDocument) =>
-    ipcRenderer.invoke(IpcProjectChannel.SAVE, id, doc),
+  saveProject: (id: string, doc: DesignDocument, thumbnail?: string) =>
+    ipcRenderer.invoke(IpcProjectChannel.SAVE, id, doc, thumbnail),
 
   importProject: (filePath: string) =>
     ipcRenderer.invoke(IpcProjectChannel.IMPORT, filePath),
@@ -50,21 +53,29 @@ const api: DesktopAPI = {
   showSaveDialog: (options: SaveDialogOptions) =>
     ipcRenderer.invoke(IpcAppChannel.SHOW_SAVE_DIALOG, options),
 
+  // ─── Agent ─────────────────────────────────────────────
+
+  listModels: (tool: AgentTool) =>
+    ipcRenderer.invoke(IpcAgentChannel.LIST_MODELS, tool),
+
   // ─── AI 生成 ───────────────────────────────────────────
 
-  startGeneration: (prompt: string, document: DesignDocument) =>
-    ipcRenderer.invoke(IpcGenerationChannel.START, prompt, document),
+  startGeneration: (input: GenerationStartInput) =>
+    ipcRenderer.invoke(IpcGenerationChannel.START, input),
 
   cancelGeneration: (runId: string) =>
     ipcRenderer.invoke(IpcGenerationChannel.CANCEL, runId),
 
-  onGenerationProgress: (callback) => {
-    const handler = (_event: unknown, progress: GenerationProgress) => {
-      callback(progress);
+  resetGenerationThread: (projectId: string) =>
+    ipcRenderer.invoke(IpcGenerationChannel.RESET, projectId),
+
+  onGenerationEvent: (callback) => {
+    const handler = (_event: unknown, generationEvent: GenerationEvent) => {
+      callback(generationEvent);
     };
-    ipcRenderer.on(IpcGenerationChannel.PROGRESS, handler);
+    ipcRenderer.on(IpcGenerationChannel.EVENT, handler);
     return () => {
-      ipcRenderer.removeListener(IpcGenerationChannel.PROGRESS, handler);
+      ipcRenderer.removeListener(IpcGenerationChannel.EVENT, handler);
     };
   },
 };

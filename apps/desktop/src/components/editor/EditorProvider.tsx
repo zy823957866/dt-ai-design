@@ -21,6 +21,7 @@ import {
   moveLayerBackward as moveLayerBackwardFn,
   moveLayerToFront as moveLayerToFrontFn,
   moveLayerToBack as moveLayerToBackFn,
+  reorderLayer as reorderLayerFn,
   setSelection,
   selectAll,
   deselectAll,
@@ -28,6 +29,16 @@ import {
   ungroupSelection,
   frameSelection,
   duplicateLayer,
+  appendFill,
+  updateFill,
+  removeFill,
+  appendStroke,
+  updateStroke,
+  removeStroke,
+  appendEffect,
+  updateEffect,
+  removeEffect,
+  replaceDocument as replaceDocumentFn,
   zoomIn as zoomInFn,
   zoomOut as zoomOutFn,
   zoomTo as zoomToFn,
@@ -47,6 +58,8 @@ import type {
 } from '@dt-ai-design/design-schema';
 
 import { EditorContext, type EditorApi } from '@/lib/editor';
+import { normalizeTextSizes } from '@/lib/textMetrics';
+import { documentThumbnailDataUrl } from '@/lib/thumbnail';
 
 interface EditorProviderProps {
   children: ReactNode;
@@ -75,13 +88,19 @@ export function EditorProvider({
   initialDocument,
   projectId,
 }: EditorProviderProps) {
-  const stateRef = useRef<EditorState>(createEditorState(initialDocument));
+  const stateRef = useRef<EditorState>(
+    createEditorState(
+      initialDocument
+        ? normalizeTextSizes(initialDocument).document
+        : undefined,
+    ),
+  );
 
   const stackRef = useRef<CommandStack>(new CommandStack(stateRef.current));
 
   const eventsRef = useRef(createEventEmitter());
 
-  const activeToolRef = useRef<string>('select');
+  const activeToolRef = useRef<string>('move');
 
   const showRulersRef = useRef(true);
 
@@ -316,6 +335,88 @@ export function EditorProvider({
     [notifyChange],
   );
 
+  const handleAppendStyleItem = useCallback(
+    (
+      layerId: string,
+      field: 'fills' | 'strokes' | 'effects',
+      item: unknown,
+    ) => {
+      const prevDoc = stateRef.current.document;
+      const run =
+        field === 'fills'
+          ? appendFill
+          : field === 'strokes'
+            ? appendStroke
+            : appendEffect;
+      const cmd = {
+        name: `appendStyleItem:${field}`,
+        execute: (s: EditorState) => run(s, layerId, item as never),
+        undo: (s: EditorState) => {
+          s.document = prevDoc;
+          return s.document;
+        },
+      };
+      stackRef.current.execute(cmd);
+      notifyChange();
+    },
+    [notifyChange],
+  );
+
+  const handleUpdateStyleItem = useCallback(
+    (
+      layerId: string,
+      field: 'fills' | 'strokes' | 'effects',
+      index: number,
+      patch: unknown,
+    ) => {
+      const prevDoc = stateRef.current.document;
+      const run =
+        field === 'fills'
+          ? updateFill
+          : field === 'strokes'
+            ? updateStroke
+            : updateEffect;
+      const cmd = {
+        name: `updateStyleItem:${field}`,
+        execute: (s: EditorState) => run(s, layerId, index, patch as never),
+        undo: (s: EditorState) => {
+          s.document = prevDoc;
+          return s.document;
+        },
+      };
+      stackRef.current.execute(cmd);
+      notifyChange();
+    },
+    [notifyChange],
+  );
+
+  const handleRemoveStyleItem = useCallback(
+    (
+      layerId: string,
+      field: 'fills' | 'strokes' | 'effects',
+      index: number,
+    ) => {
+      const prevDoc = stateRef.current.document;
+      const run =
+        field === 'fills'
+          ? removeFill
+          : field === 'strokes'
+            ? removeStroke
+            : removeEffect;
+      const cmd = {
+        name: `removeStyleItem:${field}`,
+        execute: (s: EditorState) => run(s, layerId, index),
+        undo: (s: EditorState) => {
+          s.document = prevDoc;
+          return s.document;
+        },
+      };
+      stackRef.current.execute(cmd);
+      notifyChange();
+    },
+    [notifyChange],
+  );
+
   const handleMoveLayerForward = useCallback(
     (layerId: string) => {
       const cmd = {
@@ -384,6 +485,30 @@ export function EditorProvider({
         name: 'moveLayerToBack',
 
         execute: (s: EditorState) => moveLayerToBackFn(s, layerId),
+
+        undo: (s: EditorState) => {
+          s.document = prevDoc;
+
+          return s.document;
+        },
+      };
+
+      stackRef.current.execute(cmd);
+
+      notifyChange();
+    },
+    [notifyChange],
+  );
+
+  const handleReorderLayer = useCallback(
+    (layerId: string, targetParentId: string | null, targetIndex: number) => {
+      const prevDoc = stateRef.current.document;
+
+      const cmd = {
+        name: 'reorderLayer',
+
+        execute: (s: EditorState) =>
+          reorderLayerFn(s, layerId, targetParentId, targetIndex),
 
         undo: (s: EditorState) => {
           s.document = prevDoc;
@@ -553,6 +678,23 @@ export function EditorProvider({
 
   // ─── 视口 ───
 
+  const handleReplaceDocument = useCallback(
+    (doc: DesignDocument) => {
+      const prev = stateRef.current.document;
+
+      const cmd = replaceDocumentFn(prev, doc);
+
+      stackRef.current.execute(cmd);
+
+      stateRef.current.selection = { layerIds: [] };
+
+      notifyChange();
+
+      notifySelectionChange();
+    },
+    [notifyChange, notifySelectionChange],
+  );
+
   const handleZoomIn = useCallback(() => {
     stateRef.current.viewport = zoomInFn(stateRef.current);
 
@@ -691,9 +833,11 @@ export function EditorProvider({
       saveTimeout = setTimeout(() => {
         const doc = stateRef.current.document;
 
-        window.desktopAPI.saveProject(projectId, doc).catch((err) => {
-          console.error('Auto-save failed:', err);
-        });
+        window.desktopAPI
+          .saveProject(projectId, doc, documentThumbnailDataUrl(doc))
+          .catch((err) => {
+            console.error('Auto-save failed:', err);
+          });
       }, 2000);
     });
 
@@ -727,39 +871,7 @@ export function EditorProvider({
       } else if (e.key === 'Escape') {
         handleDeselectAll();
 
-        handleSetActiveTool('select');
-      } else if (
-        !isEditingTarget(e.target as HTMLElement) &&
-        !meta &&
-        !e.ctrlKey &&
-        !e.altKey &&
-        e.key.length === 1
-      ) {
-        const key = e.key.toLowerCase();
-
-        const toolMap: Record<string, string> = {
-          v: 'select',
-
-          h: 'hand',
-
-          z: 'zoom',
-
-          r: 'rectangle',
-
-          o: 'ellipse',
-
-          f: 'frame',
-
-          t: 'text',
-
-          n: 'sticky',
-
-          p: 'pen',
-        };
-
-        if (toolMap[key]) {
-          handleSetActiveTool(toolMap[key]);
-        }
+        handleSetActiveTool('move');
       } else if (
         (e.key === 'Delete' || e.key === 'Backspace') &&
         !isEditingTarget(e.target as HTMLElement)
@@ -843,6 +955,14 @@ export function EditorProvider({
 
     moveLayerToBack: handleMoveLayerToBack,
 
+    reorderLayer: handleReorderLayer,
+
+    appendStyleItem: handleAppendStyleItem,
+
+    updateStyleItem: handleUpdateStyleItem,
+
+    removeStyleItem: handleRemoveStyleItem,
+
     setSelection: handleSetSelection,
 
     selectAll: handleSelectAll,
@@ -858,6 +978,8 @@ export function EditorProvider({
     alignSelection: handleAlignSelection,
 
     distributeSelection: handleDistributeSelection,
+
+    replaceDocument: handleReplaceDocument,
 
     zoomIn: handleZoomIn,
 

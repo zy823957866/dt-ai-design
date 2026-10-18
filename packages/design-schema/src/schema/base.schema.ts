@@ -10,20 +10,24 @@ export const layerTypeSchema = z.enum([
   'stickyNote',
   'path',
   'line',
+  'polygon',
+  'browser',
   'componentInstance',
 ]);
 
 export const blendModeSchema = z.enum([
   'normal',
-  'multiply',
-  'screen',
-  'overlay',
   'darken',
-  'lighten',
-  'colorDodge',
+  'multiply',
+  'linearBurn',
   'colorBurn',
-  'hardLight',
+  'lighten',
+  'screen',
+  'linearDodge',
+  'colorDodge',
+  'overlay',
   'softLight',
+  'hardLight',
   'difference',
   'exclusion',
   'hue',
@@ -33,6 +37,14 @@ export const blendModeSchema = z.enum([
 ]);
 
 export const idSchema = z.string().min(1);
+
+export const layerPositionSchema = z.enum(['auto', 'absolute']);
+
+export const layerMetadataSchema = z.object({
+  sourceUrl: z.string().optional(),
+  htmlId: z.string().optional(),
+  link: z.string().optional(),
+});
 
 export const baseLayerSchema = z.object({
   id: idSchema,
@@ -49,6 +61,8 @@ export const baseLayerSchema = z.object({
   parentId: z.string().nullable(),
   index: z.number().int().min(0),
   blendMode: blendModeSchema,
+  layerPosition: layerPositionSchema.default('auto'),
+  metadata: layerMetadataSchema.optional(),
 });
 
 export const layerBoundsSchema = z.object({

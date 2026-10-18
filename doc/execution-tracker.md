@@ -141,3 +141,45 @@
 5. MCP 服务（将设计图暴露给外部 Agent）
 6. AI Chat 面板
 7. Agent 运行时 + 多智能体生成引擎
+
+---
+
+## 六、pen.dev 工具栏 + 属性面板对齐（2026-10-16）
+
+> 依据源码级参考 `doc/pencil-toolbar-properties-reference.md` 与设计文档
+> `doc/superpowers/specs/2026-10-16-pen-toolbar-properties-alignment-design.md` 实施。
+> 计划：`doc/superpowers/plans/2026-10-16-pen-schema-alignment.md`、`...-pen-toolbar-alignment.md`、`...-pen-properties-panel.md`。
+
+### 已完成
+
+**Plan A · 数据模型（design-schema）**
+
+- `FrameLayout` 改为 pen.dev 单轴模型：`{ mode: none|vertical|horizontal, gap, padding, justifyContent, alignItems }`。
+- `BaseLayer` 新增 `layerPosition: auto|absolute`（zod 默认 `auto`）与可选 `metadata`。
+- `BlendMode` 补齐到 18 项；`cornerRadius` 支持四角独立；`FillType` 增加 `angularGradient`/`meshGradient`（含 `gradientType`）；`EffectType` 增加 `shader`。
+- 新增 `normalizeFrameLayout` / `normalizeDocument`，并接入 `validateDocument`（兼容旧 `layout:{enabled}` 文档）。
+
+**Plan B · 工具栏（editor-interaction + desktop）**
+
+- `CanvasToolId` 重命名 `select`→`move`、移除 `triangle`、新增 `scale`/`comment`/`polygon`/`icon`/`script`/`browser`/`pen_move`/`pen_cut`；新增 `toolToLayerType`。
+- 工具栏改为数据驱动 `TOOL_GROUPS`：Move/Scale、Primitives（Flyout，钉 Rectangle+Ellipse，Polygon/Icon/Script 置灰占位）、Pen、Text、Frame、Sticky、Browser（桌面）、Hand、Comment（占位）。
+- Pen 子工具栏（Pen/Select points/Cut/Done）+ 全局工具快捷键（钢笔流程内 P/V/X/Enter 走子工具）。
+
+**Plan C · 属性面板（desktop）**
+
+- 重构为声明式 Section 注册表（`PropertySection` + `registry`），删除旧 react-hook-form 桥。
+- 实现 Section：Header、Alignment、Position、Layout、Appearance、Fill、Stroke、Typography、Effects、Export、Metadata。
+- 共享控件：`SectionHeader`/`NumberField`（拖拽/↑↓）/`SegmentedControl`/`SelectField`/`CheckboxField`/`ColorField`。
+- `EditorApi` 新增 `appendStyleItem`/`updateStyleItem`/`removeStyleItem`（可撤销）。
+
+### 验证
+
+- `pnpm typecheck` 全仓通过；design-schema 53 / editor-core 23 / editor-interaction 4 单测通过。
+- `pnpm lint`：仅 `packages/canvas-ruler/dist/style.css`（既有、与本特性无关）stylelint 报错。
+
+### 已接受的取舍 / 后续
+
+- **多选编辑**：仅 Header/Alignment/Position 支持多选；其余 Section 在 `layers>1` 时不渲染（保留后续扩展）。
+- **Export 面板**：格式/倍率为占位，未接实际导出。
+- **非目标（未实现）**：Script、Browser 节点、Icon 节点、Theme、Slot、Component、Vector（路径编辑面板）、Shader 编辑器、Fill 的渐变/图片完整编辑器。
+- **已知 Minor（延后）**：`ColorField` 每次按键即提交（历史记录偏多）；`AppearanceSection` 的 `set` 对多选全量写入；Escape 由 `EditorProvider` 与 `useToolShortcuts` 双监听；`toolConfig` 的 `SHAPE_TOOLS` 未使用。

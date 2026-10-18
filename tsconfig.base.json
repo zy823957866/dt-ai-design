@@ -17,6 +17,9 @@
     "paths": {
       "@dt-ai-design/design-schema": ["./packages/design-schema/src/index.ts"],
       "@dt-ai-design/editor-core": ["./packages/editor-core/src/index.ts"],
+      "@dt-ai-design/editor-interaction": [
+        "./packages/editor-interaction/src/index.ts"
+      ],
       "@dt-ai-design/agent-protocol": [
         "./packages/agent-protocol/src/index.ts"
       ],
@@ -24,8 +27,20 @@
       "@dt-ai-design/agent-orchestrator": [
         "./packages/agent-orchestrator/src/index.ts"
       ],
+      "@dt-ai-design/design-canvas-tools": [
+        "./packages/design-canvas-tools/src/index.ts"
+      ],
+      "@dt-ai-design/dt-ai-design-mcp": [
+        "./packages/dt-ai-design-mcp/src/index.ts"
+      ],
       "@dt-ai-design/agent-provider-codex": [
         "./packages/agent-provider-codex/src/index.ts"
+      ],
+      "@dt-ai-design/agent-provider-core": [
+        "./packages/agent-provider-core/src/index.ts"
+      ],
+      "@dt-ai-design/agent-provider-opencode": [
+        "./packages/agent-provider-opencode/src/index.ts"
       ],
       "@dt-ai-design/canvas-ruler": ["./packages/canvas-ruler/src/index.ts"]
     }

@@ -1,9 +1,9 @@
-﻿import { AgentRun } from '@dt-ai-design/agent-runtime';
-import { CodexProvider } from '@dt-ai-design/agent-provider-codex';
+import { AgentRun } from '@dt-ai-design/agent-runtime';
+import type { AgentProvider } from '@dt-ai-design/agent-provider-core';
 import type { PlanStep, GenerationPlan } from '../planner';
 
 export interface ExecutorOptions {
-  provider?: CodexProvider;
+  provider: AgentProvider;
 }
 
 /**
@@ -12,10 +12,10 @@ export interface ExecutorOptions {
  * 执行过程中所有事件通过绑定的 AgentRun 向外转发。
  */
 export class Executor {
-  private provider: CodexProvider;
+  private provider: AgentProvider;
 
-  constructor(options: ExecutorOptions = {}) {
-    this.provider = options.provider ?? new CodexProvider();
+  constructor(options: ExecutorOptions) {
+    this.provider = options.provider;
   }
 
   /**
@@ -49,16 +49,22 @@ export class Executor {
           ? `${step.prompt}\n\n--- 已完成步骤 ---\n${contextParts.join('\n\n')}`
           : step.prompt;
 
-      const handle = this.provider.start(fullPrompt, run);
-
-      let lastPayload: unknown = null;
       try {
-        for await (const event of handle.events) {
-          if (event.type === 'agent:completed') {
-            lastPayload = event.payload;
-          }
-        }
-        await handle.done;
+        const result = await this.provider.execute({
+          prompt: fullPrompt,
+          cwd: process.cwd(),
+          responseFormat: 'text',
+          onEvent: (event) => {
+            if (event.type === 'activity') {
+              run.emit({
+                type: 'agent:step',
+                payload: { kind: 'activity', activity: event.activity },
+              });
+            }
+          },
+        });
+
+        stepResults.set(step.id, result.text);
       } catch (err) {
         if (!run.isCancelled()) {
           run.fail(err instanceof Error ? err : String(err));
@@ -66,7 +72,6 @@ export class Executor {
         throw err;
       }
 
-      stepResults.set(step.id, lastPayload);
       completed.add(step.id);
       done++;
     };

@@ -44,6 +44,30 @@ export interface EditorApi {
   moveLayerBackward: (layerId: string) => void;
   moveLayerToFront: (layerId: string) => void;
   moveLayerToBack: (layerId: string) => void;
+  /** 拖拽重排/改层级：把图层移动到目标父级下的指定索引 */
+  reorderLayer: (
+    layerId: string,
+    targetParentId: string | null,
+    targetIndex: number,
+  ) => void;
+
+  // ─── 样式数组（fills/strokes/effects）───
+  appendStyleItem: (
+    layerId: string,
+    field: 'fills' | 'strokes' | 'effects',
+    item: unknown,
+  ) => void;
+  updateStyleItem: (
+    layerId: string,
+    field: 'fills' | 'strokes' | 'effects',
+    index: number,
+    patch: unknown,
+  ) => void;
+  removeStyleItem: (
+    layerId: string,
+    field: 'fills' | 'strokes' | 'effects',
+    index: number,
+  ) => void;
 
   // ─── 选择 ───
   setSelection: (layerIds: string[]) => void;
@@ -56,6 +80,10 @@ export interface EditorApi {
   frameSelection: () => void;
   alignSelection: (direction: AlignDirection) => void;
   distributeSelection: (direction: DistributeDirection) => void;
+
+  // ─── 文档 ───
+  /** 整体替换文档（AI 生成结果应用，可撤销）。 */
+  replaceDocument: (doc: DesignDocument) => void;
 
   // ─── 视口 ───
   zoomIn: () => void;

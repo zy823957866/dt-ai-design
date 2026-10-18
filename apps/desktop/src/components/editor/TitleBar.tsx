@@ -1,4 +1,5 @@
-import { PenTool, ChevronDown, Minus, Square, X, Share } from 'lucide-react';
+import { PenTool, ChevronDown, Share, Settings } from 'lucide-react';
+import { Save } from 'lucide-react';
 
 interface TitleBarProps {
   documentName: string;
@@ -8,6 +9,8 @@ interface TitleBarProps {
   onLogoClick?: () => void;
   onExport?: () => void;
   onOpenSettings?: () => void;
+  onSave?: () => void;
+  isSaving?: boolean;
 }
 
 export function TitleBar({
@@ -18,6 +21,8 @@ export function TitleBar({
   onLogoClick,
   onExport,
   onOpenSettings,
+  onSave,
+  isSaving,
 }: TitleBarProps) {
   return (
     <header className="flex h-11 shrink-0 items-center border-b border-border bg-bg-panel px-4">
@@ -64,25 +69,24 @@ export function TitleBar({
           Export
         </button>
 
-        <div className="flex h-[30px] items-center rounded-lg bg-bg-input p-[3px]">
-          <span className="flex h-6 items-center rounded-md bg-bg-elevated px-3 text-xs text-text-primary">
-            Design
-          </span>
-        </div>
-
         <button
           type="button"
           onClick={onOpenSettings}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-[#8B5CF6] text-[11px] font-bold text-white"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-bg-hover"
+          title="Settings"
         >
-          A
+          <Settings className="h-[15px] w-[15px]" />
         </button>
 
-        <div className="flex items-center gap-[18px] pl-2 text-text-tertiary">
-          <Minus className="h-[13px] w-[13px]" />
-          <Square className="h-3 w-3" />
-          <X className="h-[13px] w-[13px]" />
-        </div>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={isSaving}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-bg-hover disabled:opacity-40"
+          title={isSaving ? 'Saving…' : 'Save'}
+        >
+          <Save className="h-[15px] w-[15px]" />
+        </button>
       </div>
     </header>
   );

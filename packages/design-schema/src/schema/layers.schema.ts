@@ -12,6 +12,7 @@ import {
   textSizingSchema,
   imageFitModeSchema,
   imageFiltersSchema,
+  sizingModeSchema,
 } from './styles.schema';
 
 // Rectangle
@@ -34,6 +35,27 @@ export const ellipseLayerSchema = baseLayerSchema.extend({
   arcStartAngle: z.number(),
   arcEndAngle: z.number(),
   innerRadius: z.number().min(0),
+  parentId: z.string().nullable(),
+  index: z.number().int().min(0),
+});
+
+// Polygon
+export const polygonLayerSchema = baseLayerSchema.extend({
+  type: z.literal('polygon'),
+  fills: z.array(fillStyleSchema),
+  strokes: z.array(strokeStyleSchema),
+  effects: z.array(effectStyleSchema),
+  cornerRadius: cornerRadiusSchema,
+  polygonCount: z.number().int().min(3).max(60),
+  parentId: z.string().nullable(),
+  index: z.number().int().min(0),
+});
+
+// Browser
+export const browserLayerSchema = baseLayerSchema.extend({
+  type: z.literal('browser'),
+  url: z.string(),
+  zoom: z.number(),
   parentId: z.string().nullable(),
   index: z.number().int().min(0),
 });
@@ -62,7 +84,7 @@ export const imageLayerSchema = baseLayerSchema.extend({
   imageSrc: z.string(),
   fitMode: imageFitModeSchema,
   filters: imageFiltersSchema,
-  cornerRadius: z.number().min(0),
+  cornerRadius: cornerRadiusSchema,
   strokes: z.array(strokeStyleSchema),
   effects: z.array(effectStyleSchema),
   parentId: z.string().nullable(),
@@ -74,10 +96,16 @@ export const frameLayerSchema = baseLayerSchema.extend({
   type: z.literal('frame'),
   children: z.array(z.string()),
   layout: frameLayoutSchema,
+  sizingMode: z
+    .object({
+      width: sizingModeSchema.default('fixed'),
+      height: sizingModeSchema.default('fixed'),
+    })
+    .default({ width: 'fixed', height: 'fixed' }),
   overflow: overflowModeSchema,
   fills: z.array(fillStyleSchema),
   strokes: z.array(strokeStyleSchema),
-  cornerRadius: z.number().min(0),
+  cornerRadius: cornerRadiusSchema,
   effects: z.array(effectStyleSchema),
   clipContent: z.boolean(),
   parentId: z.string().nullable(),
@@ -167,11 +195,13 @@ export const componentInstanceLayerSchema = baseLayerSchema.extend({
 export const layerSchema = z.discriminatedUnion('type', [
   rectangleLayerSchema,
   ellipseLayerSchema,
+  polygonLayerSchema,
   textLayerSchema,
   imageLayerSchema,
   frameLayerSchema,
   groupLayerSchema,
   stickyNoteLayerSchema,
+  browserLayerSchema,
   pathLayerSchema,
   lineLayerSchema,
   componentInstanceLayerSchema,

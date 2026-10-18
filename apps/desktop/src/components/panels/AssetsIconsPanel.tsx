@@ -141,7 +141,7 @@ export function AssetsIconsPanel({
             <button
               key={name}
               type="button"
-              className="flex h-[50px] flex-col items-center justify-center gap-1 rounded-lg bg-[#1B1B23] hover:bg-bg-hover"
+              className="flex h-[50px] flex-col items-center justify-center gap-1 rounded-lg bg-bg-elevated hover:bg-bg-hover"
             >
               <Icon className="h-[18px] w-[18px] text-text-secondary" />
               <span className="text-[9px] text-text-tertiary">{name}</span>

@@ -1,4 +1,5 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Menu } from 'electron';
+import type { MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { registerIpcHandlers } from './main/ipcHandlers';
@@ -9,6 +10,33 @@ if (started) {
 }
 
 let mainWindow: BrowserWindow | null = null;
+
+/**
+ * 自定义应用菜单：复刻 Electron 默认菜单，但移除 View 中的
+ * zoomIn / zoomOut / resetZoom 三个 role——它们的菜单加速器
+ * （Ctrl+= / Ctrl+- / Ctrl+0）会缩放整个 webContents，且渲染层
+ * 无法用 preventDefault 拦截。移除后按键下沉到页面，由画布接管。
+ */
+function setupApplicationMenu(): void {
+  const isMac = process.platform === 'darwin';
+  const template: MenuItemConstructorOptions[] = [
+    ...(isMac ? [{ role: 'appMenu' as const }] : []),
+    { role: 'fileMenu' as const },
+    { role: 'editMenu' as const },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' as const },
+        { role: 'forceReload' as const },
+        { role: 'toggleDevTools' as const },
+        { type: 'separator' as const },
+        { role: 'togglefullscreen' as const },
+      ],
+    },
+    { role: 'windowMenu' as const },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
 
 const createWindow = () => {
   mainWindow = new BrowserWindow({
@@ -46,6 +74,7 @@ const createWindow = () => {
 };
 
 app.whenReady().then(() => {
+  setupApplicationMenu();
   createWindow();
 
   app.on('activate', () => {

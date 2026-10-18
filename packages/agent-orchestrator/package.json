@@ -26,14 +26,20 @@
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@dt-ai-design/agent-protocol": "workspace:*",
-    "@dt-ai-design/agent-runtime": "workspace:*"
+    "@dt-ai-design/agent-provider-core": "workspace:*",
+    "@dt-ai-design/agent-runtime": "workspace:*",
+    "@dt-ai-design/design-schema": "workspace:*"
   },
   "devDependencies": {
+    "@dt-ai-design/design-canvas-tools": "workspace:*",
     "tsdown": "^0.23.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.3"
   }
 }

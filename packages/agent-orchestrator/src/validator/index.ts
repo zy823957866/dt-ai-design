@@ -4,6 +4,8 @@ import { validateDocument } from '@dt-ai-design/design-schema';
 export interface ValidationResult {
   valid: boolean;
   errors: string[];
+  /** 校验通过时的归一化（含默认值）文档。 */
+  document?: DesignDocument;
 }
 
 /**
@@ -24,7 +26,11 @@ export class Validator {
     }
 
     const result = validateDocument(doc as DesignDocument);
-    return { valid: result.success, errors: result.errors };
+    return {
+      valid: result.success,
+      errors: result.errors,
+      document: result.data,
+    };
   }
 
   /**
@@ -59,6 +65,8 @@ export class Validator {
     if (!schemaCheck.valid) return schemaCheck;
 
     const sanityCheck = this.sanityCheck(doc as DesignDocument);
-    return sanityCheck;
+    if (!sanityCheck.valid) return sanityCheck;
+
+    return schemaCheck;
   }
 }

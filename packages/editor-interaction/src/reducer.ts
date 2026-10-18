@@ -33,7 +33,19 @@ function boundsFromPoints(
 }
 
 function isShapeTool(tool: string): boolean {
-  return ['rectangle', 'ellipse', 'frame', 'triangle'].includes(tool);
+  return ['rectangle', 'ellipse', 'polygon', 'frame', 'browser'].includes(tool);
+}
+
+/** 工具 → 图层类型（用于 createLayer 命令） */
+export function toolToLayerType(tool: string): LayerTypeString | null {
+  if (tool === 'rectangle') return 'rectangle';
+  if (tool === 'ellipse') return 'ellipse';
+  if (tool === 'polygon') return 'polygon';
+  if (tool === 'frame') return 'frame';
+  if (tool === 'browser') return 'browser';
+  if (tool === 'sticky') return 'stickyNote';
+  if (tool === 'path' || tool === 'pen') return 'path';
+  return null;
 }
 
 export function reduceInteraction(
@@ -79,10 +91,11 @@ export function reduceInteraction(
             draft: null,
             creationBounds: null,
             textEditingLayerId: null,
+            activeTool: 'move',
           },
           commands: [
             ...resetCommands,
-            { type: 'setActiveTool', tool: 'select' },
+            { type: 'setActiveTool', tool: 'move' },
             { type: 'deselectAll' },
           ],
         };
@@ -161,7 +174,7 @@ export function reduceInteraction(
 
       // Resize handle
       if (
-        state.activeTool === 'select' &&
+        state.activeTool === 'move' &&
         event.hit.type === 'handle' &&
         event.hit.handleId
       ) {
@@ -181,7 +194,7 @@ export function reduceInteraction(
       }
 
       // Click on layer (select tool)
-      if (state.activeTool === 'select' && event.hit.type === 'layer') {
+      if (state.activeTool === 'move' && event.hit.type === 'layer') {
         const alreadySelected = state.selectedLayerIds.includes(
           event.hit.layerId,
         );
@@ -228,7 +241,7 @@ export function reduceInteraction(
       }
 
       // Click on empty canvas (select tool) �� marquee selection
-      if (state.activeTool === 'select' && event.hit.type === 'empty') {
+      if (state.activeTool === 'move' && event.hit.type === 'empty') {
         if (!event.shiftKey && state.selectedLayerIds.length > 0) {
           commands.push({ type: 'deselectAll' });
         }
@@ -358,20 +371,30 @@ export function reduceInteraction(
       }
 
       if (state.mode === 'creatingShape' && state.draft) {
-        const bounds = boundsFromPoints(
+        const raw = boundsFromPoints(
           state.draft.startPoint,
           state.draft.currentPoint,
         );
-        const isMeaningful = bounds.width > 4 && bounds.height > 4;
+        // 点击（几乎无拖拽）按默认尺寸创建；拖拽则按拖拽范围创建
+        const isClick = raw.width <= 4 && raw.height <= 4;
+        const bounds: CreationBounds = isClick
+          ? {
+              x: state.draft.startPoint.x,
+              y: state.draft.startPoint.y,
+              width: 100,
+              height: 100,
+            }
+          : raw;
 
         const endCommands: InteractionCommand[] = [
           { type: 'clearCreationOverlay' },
         ];
 
-        if (isMeaningful) {
+        const layerType = toolToLayerType(state.activeTool);
+        if (layerType) {
           endCommands.push({
             type: 'createLayer',
-            layerType: state.activeTool as LayerTypeString,
+            layerType,
             bounds,
           });
         }
@@ -382,9 +405,9 @@ export function reduceInteraction(
             mode: 'idle',
             draft: null,
             creationBounds: null,
-            activeTool: 'select',
+            activeTool: 'move',
           },
-          commands: [...endCommands, { type: 'setActiveTool', tool: 'select' }],
+          commands: [...endCommands, { type: 'setActiveTool', tool: 'move' }],
         };
       }
 

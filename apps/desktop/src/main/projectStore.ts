@@ -153,10 +153,11 @@ export async function renameProject(id: string, name: string): Promise<void> {
   await writeMeta(projectDir, meta);
 }
 
-/** 保存项目文档 */
+/** 保存项目文档（可选更新缩略图） */
 export async function saveProject(
   id: string,
   doc: DesignDocument,
+  thumbnail?: string,
 ): Promise<void> {
   const projectDir = getProjectDir(id);
 
@@ -165,10 +166,13 @@ export async function saveProject(
 
   await writeDocument(projectDir, doc);
 
-  // 更新元数据的更新时间
+  // 更新元数据的更新时间与缩略图
   const meta = await readMeta(projectDir);
   if (meta) {
     meta.updatedAt = Date.now();
+    if (thumbnail !== undefined) {
+      meta.thumbnail = thumbnail;
+    }
     await writeMeta(projectDir, meta);
   }
 }

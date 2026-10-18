@@ -100,7 +100,7 @@ export function AssetsPanel({
               key={name}
               className="flex h-[151px] flex-col overflow-hidden rounded-[10px] border border-border bg-bg-elevated"
             >
-              <div className="flex h-[104px] items-center justify-center gap-1.5 rounded-lg bg-[#1B1B23]">
+              <div className="flex h-[104px] items-center justify-center gap-1.5 rounded-lg bg-bg-panel-deep">
                 <span className="h-4 w-14 rounded bg-accent/70" />
                 <span className="h-4 w-8 rounded border border-border-strong" />
               </div>

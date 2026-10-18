@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { EditorProvider } from '@/components/editor/EditorProvider';
 import { EditorInteractionProvider } from '@/components/editor/EditorInteractionProvider';
+import { GenerationProvider } from '@/lib/generation';
 import { TitleBar } from '@/components/editor/TitleBar';
 import { LeftPanel } from '@/components/editor/LeftPanel';
 import { PropertiesPanel } from '@/components/editor/PropertiesPanel';
@@ -12,6 +13,7 @@ import {
   type OverlayName,
 } from '@/components/overlays/OverlayHost';
 import { useEditor } from '@/lib/editor';
+import { documentThumbnailDataUrl } from '@/lib/thumbnail';
 import { createDocument } from '@dt-ai-design/design-schema';
 import type { DesignDocument } from '@dt-ai-design/design-schema';
 import type { ProjectWithDocument } from '@/shared/ipc-types';
@@ -59,60 +61,85 @@ export default function EditorPage() {
 
   return (
     <EditorProvider initialDocument={initialDoc} projectId={project?.id}>
-      <EditorInteractionProvider>
-        <div className="flex h-screen w-full flex-col overflow-hidden bg-bg-canvas text-text-primary">
-          <EditorTitleBar
-            projectName={documentName}
-            onBack={() => navigate('/dashboard')}
-            onExport={() => setOverlay('export')}
-            onOpenSettings={() => setOverlay('settings')}
-          />
-
-          <div className="flex flex-1 overflow-hidden">
-            <LeftPanel
-              collapsed={leftCollapsed}
-              onCollapse={() => setLeftCollapsed(true)}
-              onExpand={() => setLeftCollapsed(false)}
+      <GenerationProvider projectId={project?.id}>
+        <EditorInteractionProvider>
+          <div className="flex h-screen w-full flex-col overflow-hidden bg-bg-canvas text-text-primary">
+            <EditorTitleBar
+              projectName={documentName}
+              fileId={fileId}
+              onBack={() => navigate('/dashboard')}
+              onExport={() => setOverlay('export')}
+              onOpenSettings={() => setOverlay('settings')}
             />
 
-            <div className="relative flex flex-1 overflow-hidden">
-              <EditorCanvasStage />
+            <div className="flex flex-1 overflow-hidden">
+              <LeftPanel
+                collapsed={leftCollapsed}
+                onCollapse={() => setLeftCollapsed(true)}
+                onExpand={() => setLeftCollapsed(false)}
+                projectId={project?.id}
+              />
+
+              <div className="relative flex flex-1 overflow-hidden">
+                <EditorCanvasStage />
+              </div>
+
+              <PropertiesPanel
+                collapsed={rightCollapsed}
+                onCollapse={() => setRightCollapsed(true)}
+                onExpand={() => setRightCollapsed(false)}
+                onOpenColor={() => setOverlay('color')}
+              />
             </div>
 
-            <PropertiesPanel
-              collapsed={rightCollapsed}
-              onCollapse={() => setRightCollapsed(true)}
-              onExpand={() => setRightCollapsed(false)}
-              onOpenColor={() => setOverlay('color')}
+            <StatusBar />
+            <InitialSelection id="frame-landing" />
+            <OverlayHost
+              panel={overlay}
+              onOpen={setOverlay}
+              onClose={() => setOverlay(null)}
             />
           </div>
-
-          <StatusBar />
-          <InitialSelection id="frame-landing" />
-          <OverlayHost
-            panel={overlay}
-            onOpen={setOverlay}
-            onClose={() => setOverlay(null)}
-          />
-        </div>
-      </EditorInteractionProvider>
+        </EditorInteractionProvider>
+      </GenerationProvider>
     </EditorProvider>
   );
 }
 
 function EditorTitleBar({
   projectName,
+  fileId,
   onBack,
   onExport,
   onOpenSettings,
 }: {
   projectName: string;
+  fileId: string;
   onBack: () => void;
   onExport: () => void;
   onOpenSettings: () => void;
 }) {
   const editor = useEditor();
   const [, forceUpdate] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const doc = editor.getDocument();
+      if (fileId !== 'new') {
+        await window.desktopAPI.saveProject(
+          fileId,
+          doc,
+          documentThumbnailDataUrl(doc),
+        );
+      }
+    } catch (err) {
+      console.error('Save failed:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   useEffect(() => {
     const off = editor.subscribe('viewportChange', () =>
@@ -129,6 +156,8 @@ function EditorTitleBar({
       onLogoClick={onBack}
       onExport={onExport}
       onOpenSettings={onOpenSettings}
+      onSave={handleSave}
+      isSaving={isSaving}
     />
   );
 }
@@ -254,7 +283,13 @@ function createSampleDocument(): DesignDocument {
     width: 620,
     height: 430,
     children: [],
-    layout: { enabled: false },
+    layout: {
+      mode: 'none',
+      gap: 0,
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      justifyContent: 'start',
+      alignItems: 'start',
+    },
     sizingMode: { width: 'fixed', height: 'fixed' },
     fills: [{ type: 'solid', color: '#1A1A22', opacity: 1 }],
     strokes: [
@@ -590,7 +625,13 @@ function createSampleDocument(): DesignDocument {
       'dash-chart',
       'dash-table',
     ],
-    layout: { enabled: true, direction: 'row', gap: 0, padding: 0 },
+    layout: {
+      mode: 'horizontal',
+      gap: 0,
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      justifyContent: 'start',
+      alignItems: 'start',
+    },
     sizingMode: { width: 'fixed', height: 'fixed' },
     fills: [{ type: 'solid', color: '#141418', opacity: 1 }],
     strokes: [],

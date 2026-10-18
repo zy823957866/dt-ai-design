@@ -1,5 +1,6 @@
 import type { BaseLayer } from './base';
 import type {
+  CornerRadius,
   FillStyle,
   StrokeStyle,
   EffectStyle,
@@ -21,7 +22,7 @@ export interface RectangleLayer extends BaseLayer {
   type: 'rectangle';
   fills: FillStyle[];
   strokes: StrokeStyle[];
-  cornerRadius: number;
+  cornerRadius: CornerRadius;
   effects: EffectStyle[];
 }
 
@@ -34,6 +35,26 @@ export interface EllipseLayer extends BaseLayer {
   arcStartAngle: number;
   arcEndAngle: number;
   innerRadius: number;
+}
+
+/** 多边形图层 */
+export interface PolygonLayer extends BaseLayer {
+  type: 'polygon';
+  fills: FillStyle[];
+  strokes: StrokeStyle[];
+  effects: EffectStyle[];
+  cornerRadius: CornerRadius;
+  /** 边数，3–60 */
+  polygonCount: number;
+}
+
+/** 浏览器图层（画布内嵌网页） */
+export interface BrowserLayer extends BaseLayer {
+  type: 'browser';
+  /** 网页 URL */
+  url: string;
+  /** 页面缩放，默认 1 */
+  zoom: number;
 }
 
 /** 文字图层 */
@@ -61,7 +82,7 @@ export interface ImageLayer extends BaseLayer {
   type: 'image';
   imageSrc: string;
   fitMode: ImageFitMode;
-  cornerRadius: number;
+  cornerRadius: CornerRadius;
   strokes: StrokeStyle[];
   effects: EffectStyle[];
   filters: ImageFilters;
@@ -79,7 +100,7 @@ export interface FrameLayer extends BaseLayer {
   };
   fills: FillStyle[];
   strokes: StrokeStyle[];
-  cornerRadius: number;
+  cornerRadius: CornerRadius;
   effects: EffectStyle[];
   overflow: OverflowMode;
   clipContent: boolean;
@@ -161,11 +182,13 @@ export interface ComponentInstanceLayer extends BaseLayer {
 export type Layer =
   | RectangleLayer
   | EllipseLayer
+  | PolygonLayer
   | TextLayer
   | ImageLayer
   | FrameLayer
   | GroupLayer
   | StickyNoteLayer
+  | BrowserLayer
   | PathLayer
   | LineLayer
   | ComponentInstanceLayer;

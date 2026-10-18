@@ -4,12 +4,27 @@ import {
   IpcSettingsChannel,
   IpcAppChannel,
   IpcGenerationChannel,
+  IpcAgentChannel,
   type OpenDialogOptions,
   type SaveDialogOptions,
+  type GenerationStartInput,
 } from '../shared/ipc-types';
+import type { AgentTool } from '@dt-ai-design/agent-provider-core';
 import * as projectStore from './projectStore';
 import * as settingsStore from './settings';
+import { CanvasAgentRuntime } from './canvasAgentRuntime';
+import { toolRegistry, resolveToolCommand } from './toolRegistry';
 import type { DesignDocument } from '@dt-ai-design/design-schema';
+
+let canvasAgentRuntime: CanvasAgentRuntime | null = null;
+
+/** 懒创建画布智能体运行时（首次调用时 app 已 ready）。 */
+function getCanvasAgentRuntime(): CanvasAgentRuntime {
+  if (!canvasAgentRuntime) {
+    canvasAgentRuntime = new CanvasAgentRuntime({ app });
+  }
+  return canvasAgentRuntime;
+}
 
 /**
  * 注册所有 IPC 处理器
@@ -42,8 +57,8 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     IpcProjectChannel.SAVE,
-    async (_event, id: string, doc: DesignDocument) => {
-      await projectStore.saveProject(id, doc);
+    async (_event, id: string, doc: DesignDocument, thumbnail?: string) => {
+      await projectStore.saveProject(id, doc, thumbnail);
     },
   );
 
@@ -94,25 +109,43 @@ export function registerIpcHandlers(): void {
     },
   );
 
-  // ─── AI 生成（占位） ───────────────────────────────────
+  // ─── Agent ─────────────────────────────────────────────
 
   ipcMain.handle(
-    IpcGenerationChannel.START,
-    async (_event, _prompt: string, _document: DesignDocument) => {
-      void _event;
-      void _prompt;
-      void _document;
-      // TODO: Phase 8 实现
-      return `run_${Date.now()}`;
+    IpcAgentChannel.LIST_MODELS,
+    async (_event, tool: AgentTool) => {
+      const definition = toolRegistry[tool];
+      if (!definition) return [];
+      const command = resolveToolCommand(tool);
+      try {
+        return await definition.listModels({ command });
+      } catch (error) {
+        console.error(
+          `[listModels] tool=${tool} command=${command} error=`,
+          error,
+        );
+        return [];
+      }
     },
   );
 
+  // ─── AI 生成 ───────────────────────────────────────────
+
   ipcMain.handle(
-    IpcGenerationChannel.CANCEL,
-    async (_event, _runId: string) => {
-      void _event;
-      void _runId;
-      // TODO: Phase 8 实现
+    IpcGenerationChannel.START,
+    async (event, input: GenerationStartInput) => {
+      return getCanvasAgentRuntime().start(event.sender, input);
+    },
+  );
+
+  ipcMain.handle(IpcGenerationChannel.CANCEL, async (_event, runId: string) => {
+    getCanvasAgentRuntime().cancel(runId);
+  });
+
+  ipcMain.handle(
+    IpcGenerationChannel.RESET,
+    async (_event, projectId: string) => {
+      getCanvasAgentRuntime().resetThread(projectId);
     },
   );
 }

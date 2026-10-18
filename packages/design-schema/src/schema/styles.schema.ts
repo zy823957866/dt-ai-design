@@ -5,6 +5,8 @@ export const fillTypeSchema = z.enum([
   'solid',
   'linearGradient',
   'radialGradient',
+  'angularGradient',
+  'meshGradient',
   'image',
 ]);
 
@@ -17,6 +19,7 @@ export const fillStyleSchema = z.object({
   type: fillTypeSchema,
   color: z.string().optional(),
   gradientStops: z.array(gradientStopSchema).optional(),
+  gradientType: z.enum(['linear', 'radial', 'angular', 'mesh']).optional(),
   imageSrc: z.string().optional(),
   opacity: z.number().min(0).max(1),
 });
@@ -36,8 +39,11 @@ export const effectTypeSchema = z.enum([
   'dropShadow',
   'innerShadow',
   'blur',
+  'layerBlur',
+  'backgroundBlur',
   'outerGlow',
   'innerGlow',
+  'shader',
 ]);
 
 export const effectStyleSchema = z.object({
@@ -50,36 +56,15 @@ export const effectStyleSchema = z.object({
   opacity: z.number().min(0).max(1).optional(),
 });
 
-export const flexDirectionSchema = z.enum([
-  'row',
-  'rowReverse',
-  'column',
-  'columnReverse',
-]);
-export const flexWrapSchema = z.enum(['nowrap', 'wrap', 'wrapReverse']);
+export const frameLayoutModeSchema = z.enum(['none', 'vertical', 'horizontal']);
 export const justifyContentSchema = z.enum([
-  'flexStart',
+  'start',
   'center',
-  'flexEnd',
+  'end',
   'spaceBetween',
   'spaceAround',
-  'spaceEvenly',
 ]);
-export const alignItemsSchema = z.enum([
-  'flexStart',
-  'center',
-  'flexEnd',
-  'stretch',
-  'baseline',
-]);
-export const alignContentSchema = z.enum([
-  'flexStart',
-  'center',
-  'flexEnd',
-  'spaceBetween',
-  'spaceAround',
-  'stretch',
-]);
+export const alignItemsSchema = z.enum(['start', 'center', 'end']);
 
 export const paddingSchema = z.object({
   top: z.number().min(0),
@@ -88,25 +73,12 @@ export const paddingSchema = z.object({
   left: z.number().min(0),
 });
 
-export const flexLayoutSchema = z.object({
-  direction: flexDirectionSchema,
-  wrap: flexWrapSchema,
-  justifyContent: justifyContentSchema,
-  alignItems: alignItemsSchema,
-  alignContent: alignContentSchema,
+export const frameLayoutSchema = z.object({
+  mode: frameLayoutModeSchema,
   gap: z.number().min(0),
   padding: paddingSchema,
-});
-
-export const frameLayoutSchema = z.object({
-  enabled: z.boolean(),
-  direction: flexDirectionSchema.optional(),
-  wrap: flexWrapSchema.optional(),
-  justifyContent: justifyContentSchema.optional(),
-  alignItems: alignItemsSchema.optional(),
-  alignContent: alignContentSchema.optional(),
-  gap: z.number().min(0).optional(),
-  padding: paddingSchema.optional(),
+  justifyContent: justifyContentSchema,
+  alignItems: alignItemsSchema,
 });
 
 export const cornerRadiusPerCornerSchema = z.object({

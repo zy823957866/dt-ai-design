@@ -2,10 +2,12 @@
   Layer,
   RectangleLayer,
   EllipseLayer,
+  PolygonLayer,
   FrameLayer,
   TextLayer,
   ImageLayer,
   StickyNoteLayer,
+  BrowserLayer,
   PathLayer,
   LineLayer,
   GroupLayer,
@@ -22,11 +24,13 @@ import { generateId } from './id';
 export type LayerTypeString =
   | 'rectangle'
   | 'ellipse'
+  | 'polygon'
   | 'text'
   | 'image'
   | 'frame'
   | 'group'
   | 'stickyNote'
+  | 'browser'
   | 'path'
   | 'line'
   | 'componentInstance';
@@ -34,7 +38,14 @@ export type LayerTypeString =
 /** 默认填充 */
 const defaultFill: FillStyle = {
   type: 'solid',
-  color: '#7C3AED',
+  color: '#CCCCCC',
+  opacity: 1,
+};
+
+/** 矩形/圆形等形状的默认填充 */
+const defaultShapeFill: FillStyle = {
+  type: 'solid',
+  color: '#CCCCCC',
   opacity: 1,
 };
 
@@ -47,9 +58,13 @@ const defaultStroke: StrokeStyle = {
   opacity: 1,
 };
 
-/** 默认 Frame 布局 */
+/** 默认 Frame 布局（pen.dev 单轴模型） */
 const defaultFrameLayout: FrameLayout = {
-  enabled: false,
+  mode: 'none',
+  gap: 0,
+  padding: { top: 0, right: 0, bottom: 0, left: 0 },
+  justifyContent: 'start',
+  alignItems: 'start',
 };
 
 /** 默认图片滤镜 */
@@ -69,11 +84,13 @@ function defaultLayerName(type: LayerTypeString): string {
   const baseNames: Record<LayerTypeString, string> = {
     rectangle: 'Rectangle',
     ellipse: 'Ellipse',
+    polygon: 'Polygon',
     text: 'Text',
     image: 'Image',
     frame: 'Frame',
     group: 'Group',
     stickyNote: 'Sticky Note',
+    browser: 'Browser',
     path: 'Path',
     line: 'Line',
     componentInstance: 'Component',
@@ -106,6 +123,7 @@ function baseLayerProps(
     parentId: null,
     index: 0,
     blendMode: 'normal',
+    layerPosition: 'auto' as const,
   };
 }
 
@@ -120,6 +138,14 @@ export function createLayer(
   type: 'ellipse',
   props?: Partial<EllipseLayer>,
 ): EllipseLayer;
+export function createLayer(
+  type: 'polygon',
+  props?: Partial<PolygonLayer>,
+): PolygonLayer;
+export function createLayer(
+  type: 'browser',
+  props?: Partial<BrowserLayer>,
+): BrowserLayer;
 export function createLayer(
   type: 'text',
   props?: Partial<TextLayer>,
@@ -162,7 +188,7 @@ export function createLayer(
     case 'rectangle':
       return {
         ...base,
-        fills: [{ ...defaultFill }],
+        fills: [{ ...defaultShapeFill }],
         strokes: [],
         cornerRadius: 0,
         effects: [],
@@ -172,7 +198,7 @@ export function createLayer(
     case 'ellipse':
       return {
         ...base,
-        fills: [{ ...defaultFill }],
+        fills: [{ ...defaultShapeFill }],
         strokes: [],
         effects: [],
         arcStartAngle: 0,
@@ -180,6 +206,25 @@ export function createLayer(
         innerRadius: 0,
         ...props,
       } as EllipseLayer;
+
+    case 'polygon':
+      return {
+        ...base,
+        fills: [{ ...defaultShapeFill }],
+        strokes: [],
+        effects: [],
+        cornerRadius: 0,
+        polygonCount: 6,
+        ...props,
+      } as PolygonLayer;
+
+    case 'browser':
+      return {
+        ...base,
+        url: '',
+        zoom: 1,
+        ...props,
+      } as BrowserLayer;
 
     case 'text':
       return {
@@ -193,7 +238,7 @@ export function createLayer(
         textAlign: 'left',
         verticalAlign: 'top',
         textDecoration: 'none',
-        fills: [{ type: 'solid' as const, color: '#E4E4E7', opacity: 1 }],
+        fills: [{ type: 'solid' as const, color: '#000000', opacity: 1 }],
         strokes: [],
         sizing: 'autoHeight',
         ...props,
@@ -216,7 +261,8 @@ export function createLayer(
         ...base,
         children: [],
         layout: { ...defaultFrameLayout },
-        fills: [{ type: 'solid' as const, color: '#1E1E24', opacity: 1 }],
+        sizingMode: { width: 'fixed', height: 'fixed' },
+        fills: [{ type: 'solid' as const, color: '#FFFFFF', opacity: 1 }],
         strokes: [],
         cornerRadius: 0,
         effects: [],

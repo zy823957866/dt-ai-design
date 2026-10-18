@@ -5,6 +5,11 @@
  */
 
 import type { DesignDocument } from '@dt-ai-design/design-schema';
+import type {
+  AgentTool,
+  AgentModelInfo,
+} from '@dt-ai-design/agent-provider-core';
+export type { AgentTool, AgentModelInfo };
 
 // ─── 项目 ────────────────────────────────────────────────
 
@@ -37,6 +42,8 @@ export interface AppSettings {
   recentProjects: string[];
   autoSave: boolean;
   autoSaveInterval: number;
+  tool: AgentTool;
+  model: string;
 }
 
 export const IpcSettingsChannel = {
@@ -55,17 +62,105 @@ export const IpcAppChannel = {
 
 // ─── AI 生成 ─────────────────────────────────────────────
 
-export interface GenerationProgress {
-  runId: string;
-  status: 'idle' | 'planning' | 'generating' | 'verifying' | 'done' | 'error';
-  message?: string;
-  progress: number;
+/** codex bash 命令执行活动（时间线展示用）。 */
+export interface GenerationActivity {
+  id: string;
+  kind: 'bash';
+  status: 'running' | 'completed' | 'failed';
+  input: { command: string };
+  output?: { summary: string };
+  error?: { code: string; message: string };
 }
+
+export type GenerationStage =
+  | 'planning'
+  | 'editing'
+  | 'executing'
+  | 'verifying'
+  | 'validating'
+  | 'repairing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+export interface GenerationWarning {
+  code: string;
+  message: string;
+  nodeId?: string;
+}
+
+/** 本次运行的智能体（用于画布光标/扫描）。 */
+export interface GenerationAgent {
+  agentId: string;
+  label?: string;
+  color?: string;
+  regionId?: string;
+}
+
+/** main → renderer 的生成事件流（Pencil 式：工具调用/回执 + 文档 + 截图）。 */
+export type GenerationEvent =
+  | { type: 'stage'; runId: string; stage: GenerationStage; message?: string }
+  | { type: 'activity'; runId: string; activity: GenerationActivity }
+  | { type: 'agents'; runId: string; agents: GenerationAgent[] }
+  | {
+      type: 'tool-call';
+      runId: string;
+      callId: string;
+      tool: string;
+      input: unknown;
+      agentId?: string;
+      regionId?: string;
+    }
+  | {
+      type: 'tool-result';
+      runId: string;
+      callId: string;
+      tool: string;
+      ok: boolean;
+      output?: string[];
+      refs?: Record<string, string>;
+      warnings?: GenerationWarning[];
+      error?: { message: string; editId?: string };
+      agentId?: string;
+      regionId?: string;
+    }
+  | { type: 'message'; runId: string; text: string }
+  | { type: 'screenshot'; runId: string; nodeIds: string[]; images?: string[] }
+  | {
+      type: 'document';
+      runId: string;
+      revision: number;
+      document: DesignDocument;
+    }
+  | {
+      type: 'done';
+      runId: string;
+      status: 'completed' | 'failed' | 'cancelled';
+      error?: string;
+    };
+
+export interface GenerationStartInput {
+  projectId: string;
+  prompt: string;
+  document: DesignDocument;
+  tool: AgentTool;
+  model?: string;
+  /** 是否启用多智能体并行（区域规划 + 协作者）。 */
+  multiAgent?: boolean;
+}
+
+export type GenerationStartResult =
+  { success: true; runId: string } | { success: false; error: string };
 
 export const IpcGenerationChannel = {
   START: 'generation:start',
   CANCEL: 'generation:cancel',
-  PROGRESS: 'generation:progress',
+  RESET: 'generation:reset',
+  EVENT: 'generation:event',
+} as const;
+
+export const IpcAgentChannel = {
+  LIST_MODELS: 'agent:listModels',
 } as const;
 
 // ─── Preload API 类型 ────────────────────────────────────
@@ -77,7 +172,11 @@ export interface DesktopAPI {
   openProject: (id: string) => Promise<ProjectWithDocument>;
   deleteProject: (id: string) => Promise<void>;
   renameProject: (id: string, name: string) => Promise<void>;
-  saveProject: (id: string, doc: DesignDocument) => Promise<void>;
+  saveProject: (
+    id: string,
+    doc: DesignDocument,
+    thumbnail?: string,
+  ) => Promise<void>;
   importProject: (filePath: string) => Promise<ProjectWithDocument>;
 
   // Settings
@@ -91,13 +190,15 @@ export interface DesktopAPI {
 
   // Generation
   startGeneration: (
-    prompt: string,
-    document: DesignDocument,
-  ) => Promise<string>;
+    input: GenerationStartInput,
+  ) => Promise<GenerationStartResult>;
   cancelGeneration: (runId: string) => Promise<void>;
-  onGenerationProgress: (
-    callback: (progress: GenerationProgress) => void,
-  ) => () => void;
+  /** 丢弃项目的 AI 会话上下文，下次生成开新会话。 */
+  resetGenerationThread: (projectId: string) => Promise<void>;
+  onGenerationEvent: (callback: (event: GenerationEvent) => void) => () => void;
+
+  // Agent
+  listModels: (tool: AgentTool) => Promise<AgentModelInfo[]>;
 }
 
 export interface OpenDialogOptions {

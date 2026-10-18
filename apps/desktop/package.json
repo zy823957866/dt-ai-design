@@ -15,11 +15,21 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "release": "electron-forge release",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
+    "@dt-ai-design/agent-orchestrator": "workspace:*",
+    "@dt-ai-design/agent-protocol": "workspace:*",
+    "@dt-ai-design/agent-provider-codex": "workspace:*",
+    "@dt-ai-design/agent-provider-core": "workspace:*",
+    "@dt-ai-design/agent-provider-opencode": "workspace:*",
+    "@dt-ai-design/agent-runtime": "workspace:*",
     "@dt-ai-design/canvas-ruler": "workspace:*",
+    "@dt-ai-design/design-canvas-tools": "workspace:*",
     "@dt-ai-design/design-schema": "workspace:*",
+    "@dt-ai-design/dt-ai-design-mcp": "workspace:*",
     "@dt-ai-design/editor-core": "workspace:*",
     "@dt-ai-design/editor-interaction": "workspace:*",
     "@use-gesture/react": "^10.3.1",

@@ -10,6 +10,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   recentProjects: [],
   autoSave: true,
   autoSaveInterval: 30000,
+  tool: 'codex',
+  model: '',
 };
 
 function getSettingsPath(): string {

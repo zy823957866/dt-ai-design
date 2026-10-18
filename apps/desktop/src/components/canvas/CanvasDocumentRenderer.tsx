@@ -5,11 +5,14 @@ import type {
   FrameLayer,
   RectangleLayer,
   EllipseLayer,
+  PolygonLayer,
   TextLayer,
   GroupLayer,
   StickyNoteLayer,
+  BrowserLayer,
   StrokeStyle,
   EffectStyle,
+  CornerRadius,
   DesignDocument,
 } from '@dt-ai-design/design-schema';
 
@@ -19,6 +22,8 @@ export interface CanvasDocumentRendererProps {
   doc: DesignDocument;
   selectedIds: string[];
   hoveredId: string | null;
+  /** 正在内联编辑的文字图层 id（该图层不渲染 SVG 文本，避免与输入框重影） */
+  editingTextId?: string | null;
   onLayerClick: (e: React.MouseEvent, layerId: string) => void;
   onLayerDoubleClick: (e: React.MouseEvent, layerId: string) => void;
   onLayerEnter: (layerId: string) => void;
@@ -55,6 +60,10 @@ function getFilterUrl(layer: Layer): string {
   const hasShadow = effects.some((e) => e.type === 'dropShadow');
   if (hasShadow) return `url(#${getShadowFilterId(layer.id)})`;
   return '';
+}
+
+function getCornerRadius(value: CornerRadius): number {
+  return typeof value === 'number' ? value : (value?.topLeft ?? 0);
 }
 
 function textAlignToAnchor(
@@ -104,6 +113,7 @@ interface LayerNodeProps {
   doc: DesignDocument;
   selected: boolean;
   hovered: boolean;
+  editingTextId?: string | null;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick?: (e: React.MouseEvent) => void;
   onMouseEnter: () => void;
@@ -115,6 +125,7 @@ function LayerNode({
   doc,
   selected,
   hovered,
+  editingTextId,
   onClick,
   onDoubleClick,
   onMouseEnter,
@@ -132,6 +143,7 @@ function LayerNode({
           doc={doc}
           selected={selected}
           hovered={hovered}
+          editingTextId={editingTextId}
           {...common}
         />
       );
@@ -142,6 +154,7 @@ function LayerNode({
           doc={doc}
           selected={selected}
           hovered={hovered}
+          editingTextId={editingTextId}
           {...common}
         />
       );
@@ -163,10 +176,29 @@ function LayerNode({
           {...common}
         />
       );
+    case 'polygon':
+      return (
+        <PolygonLayerNode
+          layer={layer as PolygonLayer}
+          selected={selected}
+          hovered={hovered}
+          {...common}
+        />
+      );
+    case 'browser':
+      return (
+        <BrowserLayerNode
+          layer={layer as BrowserLayer}
+          selected={selected}
+          hovered={hovered}
+          {...common}
+        />
+      );
     case 'text':
       return (
         <TextLayerNode
           layer={layer as TextLayer}
+          editing={editingTextId === layer.id}
           selected={selected}
           hovered={hovered}
           {...common}
@@ -203,6 +235,7 @@ function LayerNode({
 function FrameLayerNode({
   layer,
   doc,
+  editingTextId,
   onClick,
   onDoubleClick,
   onMouseEnter,
@@ -212,6 +245,7 @@ function FrameLayerNode({
   doc: DesignDocument;
   selected: boolean;
   hovered: boolean;
+  editingTextId?: string | null;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick?: (e: React.MouseEvent) => void;
   onMouseEnter: () => void;
@@ -241,8 +275,8 @@ function FrameLayerNode({
         stroke={stroke?.color || 'transparent'}
         strokeWidth={stroke?.width || 0}
         strokeDasharray={strokeDasharray}
-        rx={layer.cornerRadius || 0}
-        ry={layer.cornerRadius || 0}
+        rx={getCornerRadius(layer.cornerRadius)}
+        ry={getCornerRadius(layer.cornerRadius)}
         opacity={layer.opacity}
         filter={filter || undefined}
       />
@@ -254,6 +288,7 @@ function FrameLayerNode({
             key={childId}
             layer={child}
             doc={doc}
+            editingTextId={editingTextId}
             selected={false}
             hovered={false}
             onClick={(e) => {
@@ -265,15 +300,17 @@ function FrameLayerNode({
           />
         );
       })}
-      <text
-        x={layer.x + 4}
-        y={layer.y - 6}
-        fontSize={11}
-        fill="#6b7280"
-        fontFamily="var(--font-sans)"
-      >
-        {layer.name}
-      </text>
+      {layer.type === 'frame' && layer.parentId === null && layer.name ? (
+        <text
+          x={layer.x + 4}
+          y={layer.y - 6}
+          fontSize={11}
+          fill="#6b7280"
+          fontFamily="var(--font-sans)"
+        >
+          {layer.name}
+        </text>
+      ) : null}
     </g>
   );
 }
@@ -281,6 +318,7 @@ function FrameLayerNode({
 function GroupLayerNode({
   layer,
   doc,
+  editingTextId,
   onClick,
   onDoubleClick,
   onMouseEnter,
@@ -290,6 +328,7 @@ function GroupLayerNode({
   doc: DesignDocument;
   selected: boolean;
   hovered: boolean;
+  editingTextId?: string | null;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick?: (e: React.MouseEvent) => void;
   onMouseEnter: () => void;
@@ -317,6 +356,7 @@ function GroupLayerNode({
             key={childId}
             layer={child}
             doc={doc}
+            editingTextId={editingTextId}
             selected={false}
             hovered={false}
             onClick={(e) => {
@@ -365,8 +405,8 @@ function RectangleLayerNode({
         stroke={stroke?.color || 'transparent'}
         strokeWidth={stroke?.width || 0}
         strokeDasharray={strokeDasharray}
-        rx={layer.cornerRadius || 0}
-        ry={layer.cornerRadius || 0}
+        rx={getCornerRadius(layer.cornerRadius)}
+        ry={getCornerRadius(layer.cornerRadius)}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
         onMouseEnter={onMouseEnter}
@@ -426,14 +466,164 @@ function EllipseLayerNode({
   );
 }
 
-function TextLayerNode({
+function polygonPoints(
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  count: number,
+): string {
+  const n = Math.max(3, Math.min(60, Math.round(count) || 3));
+  const pts: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const angle = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+    pts.push(`${cx + rx * Math.cos(angle)},${cy + ry * Math.sin(angle)}`);
+  }
+  return pts.join(' ');
+}
+
+function PolygonLayerNode({
   layer,
   onClick,
   onDoubleClick,
   onMouseEnter,
   onMouseLeave,
 }: {
+  layer: PolygonLayer;
+  selected: boolean;
+  hovered: boolean;
+  onClick: (e: React.MouseEvent) => void;
+  onDoubleClick?: (e: React.MouseEvent) => void;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+}) {
+  const fill = layer.fills?.[0];
+  const stroke = layer.strokes?.[0];
+  const cx = layer.x + layer.width / 2;
+  const cy = layer.y + layer.height / 2;
+  const transform = getLayerTransform(layer);
+  const filter = getFilterUrl(layer);
+  const strokeDasharray = getStrokeDasharray(stroke);
+
+  return (
+    <g transform={transform}>
+      <polygon
+        points={polygonPoints(
+          cx,
+          cy,
+          layer.width / 2,
+          layer.height / 2,
+          layer.polygonCount,
+        )}
+        fill={fill?.color || 'transparent'}
+        fillOpacity={fill?.opacity ?? layer.opacity}
+        stroke={stroke?.color || 'transparent'}
+        strokeWidth={stroke?.width || 0}
+        strokeDasharray={strokeDasharray}
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        style={{ cursor: layer.locked ? 'not-allowed' : 'move' }}
+        filter={filter || undefined}
+      />
+    </g>
+  );
+}
+
+function BrowserLayerNode({
+  layer,
+  onClick,
+  onDoubleClick,
+  onMouseEnter,
+  onMouseLeave,
+}: {
+  layer: BrowserLayer;
+  selected: boolean;
+  hovered: boolean;
+  onClick: (e: React.MouseEvent) => void;
+  onDoubleClick?: (e: React.MouseEvent) => void;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+}) {
+  const transform = getLayerTransform(layer);
+
+  return (
+    <g transform={transform}>
+      <foreignObject
+        x={layer.x}
+        y={layer.y}
+        width={layer.width}
+        height={layer.height}
+        style={{ pointerEvents: 'none' }}
+        opacity={layer.opacity}
+      >
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            overflow: 'hidden',
+            background: '#ffffff',
+            borderRadius: 4,
+          }}
+        >
+          {layer.url ? (
+            <iframe
+              src={layer.url}
+              title={layer.name}
+              style={{
+                width: '100%',
+                height: '100%',
+                border: 'none',
+                zoom: layer.zoom || 1,
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                display: 'flex',
+                width: '100%',
+                height: '100%',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#6b7280',
+                fontFamily: 'var(--font-sans)',
+                fontSize: 12,
+              }}
+            >
+              Browser · 设置 URL
+            </div>
+          )}
+        </div>
+      </foreignObject>
+      <rect
+        x={layer.x}
+        y={layer.y}
+        width={layer.width}
+        height={layer.height}
+        fill="transparent"
+        stroke="rgba(124,58,237,0.4)"
+        strokeWidth={1}
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        style={{ cursor: layer.locked ? 'not-allowed' : 'move' }}
+      />
+    </g>
+  );
+}
+
+function TextLayerNode({
+  layer,
+  editing,
+  onClick,
+  onDoubleClick,
+  onMouseEnter,
+  onMouseLeave,
+}: {
   layer: TextLayer;
+  editing?: boolean;
   selected: boolean;
   hovered: boolean;
   onClick: (e: React.MouseEvent) => void;
@@ -469,7 +659,7 @@ function TextLayerNode({
         fontSize={layer.fontSize}
         fontWeight={layer.fontWeight}
         fontFamily={layer.fontFamily || 'var(--font-sans)'}
-        fill={fill?.color || '#e4e4e7'}
+        fill={fill?.color || '#000000'}
         opacity={layer.opacity}
         textAnchor={anchor}
         style={textStyle}
@@ -479,7 +669,7 @@ function TextLayerNode({
         onMouseLeave={onMouseLeave}
         filter={filter || undefined}
       >
-        {layer.content || 'Text'}
+        {editing ? '' : layer.content || ''}
       </text>
     </g>
   );
@@ -548,6 +738,7 @@ export function CanvasDocumentRenderer({
   doc,
   selectedIds,
   hoveredId,
+  editingTextId,
   onLayerClick,
   onLayerDoubleClick,
   onLayerEnter,
@@ -572,6 +763,7 @@ export function CanvasDocumentRenderer({
           doc={doc}
           selected={selectedIds.includes(layer.id)}
           hovered={hoveredId === layer.id}
+          editingTextId={editingTextId}
           onClick={(e) => onLayerClick(e, layer.id)}
           onDoubleClick={(e) => onLayerDoubleClick(e, layer.id)}
           onMouseEnter={() => onLayerEnter(layer.id)}

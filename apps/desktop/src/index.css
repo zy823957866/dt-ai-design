@@ -169,3 +169,67 @@ html,
   --color-info: #2563eb;
   --color-info-bg: #dbeafe;
 }
+
+/* ─── AI 生成：智能体光标与区域扫描 ─── */
+
+@keyframes editor-agent-cursor-orbit {
+  0%,
+  100% {
+    transform: translate(0, -3px);
+  }
+
+  25% {
+    transform: translate(4px, 0);
+  }
+
+  50% {
+    transform: translate(0, 3px);
+  }
+
+  75% {
+    transform: translate(-4px, 0);
+  }
+}
+
+@keyframes editor-agent-scan-sweep {
+  0% {
+    transform: translateY(-120%);
+  }
+
+  100% {
+    transform: translateY(460%);
+  }
+}
+
+@keyframes editor-agent-border-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.editor-agent-cursor-orbit {
+  animation: editor-agent-cursor-orbit 2.4s linear infinite;
+  will-change: transform;
+}
+
+.editor-agent-scan-sweep {
+  animation: editor-agent-scan-sweep 2.2s ease-in-out infinite;
+}
+
+.editor-agent-scan-border {
+  animation: editor-agent-border-pulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-agent-cursor-orbit,
+  .editor-agent-scan-sweep,
+  .editor-agent-scan-border {
+    animation: none;
+    transform: none;
+  }
+}

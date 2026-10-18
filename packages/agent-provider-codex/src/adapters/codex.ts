@@ -1,225 +1,213 @@
-﻿import { spawn } from 'node:child_process';
-import type { AgentCommand, AgentEvent } from '@dt-ai-design/agent-protocol';
-import type { AgentRun } from '@dt-ai-design/agent-runtime';
+import type { ChildProcess } from 'node:child_process';
+
+import {
+  AgentExecError,
+  extractJson,
+  readLines,
+  readStream,
+  spawnCli,
+  terminateTree,
+  type AgentExecRequest,
+  type AgentExecResult,
+  type AgentProvider,
+} from '@dt-ai-design/agent-provider-core';
+
+import { parseCodexJsonlEvent, parseCodexThreadId } from '../jsonl';
 
 export interface CodexProviderOptions {
-  /** Codex CLI 可执行文件路径或命令名，默认 "codex" */
+  /** codex 可执行命令或路径；默认取 CODEX_CLI_PATH 环境变量或 "codex"。 */
   command?: string;
-  /** 工作目录 */
-  cwd?: string;
-  /** 附加环境变量 */
+  /** 附加环境变量。 */
   env?: Record<string, string>;
 }
 
-export interface CodexRunHandle {
-  /** 事件流（异步迭代器） */
-  events: AsyncGenerator<AgentEvent>;
-  /** 主动取消 */
-  cancel: () => void;
-  /** Promise，等待进程退出 */
-  done: Promise<number | null>;
-}
+const MAX_STDERR_LENGTH = 16000;
 
 /**
  * Codex CLI 适配器。
  *
- * 通过子进程方式调用 `codex exec --json`，把 stdout 的 JSONL 解析为 AgentEvent 事件流，
- * 并把进程生命周期绑定到 AgentRun 上。
+ * 通过 `codex exec --json` 子进程执行一次对话：
+ * - prompt 经 stdin 传入（规避 argv 长度上限与转义问题）
+ * - stdout JSONL 逐行解析为事件（bash 活动 / 最终消息）
+ * - conversation.type === 'resume' 时用 `codex exec resume <id>` 延续会话
+ * - AbortSignal 触发时终止进程（Windows 下 taskkill /T 树杀）
  */
-export class CodexProvider {
-  private command: string;
-  private cwd?: string;
-  private env?: Record<string, string>;
+export class CodexProvider implements AgentProvider {
+  private readonly command: string;
+  private readonly env?: Record<string, string>;
 
   constructor(options: CodexProviderOptions = {}) {
-    this.command = options.command ?? 'codex';
-    this.cwd = options.cwd;
+    this.command = options.command ?? process.env.CODEX_CLI_PATH ?? 'codex';
     this.env = options.env;
   }
 
-  /**
-   * 启动一次 Codex 执行。
-   *
-   * @param prompt 传给 codex 的 prompt 文本
-   * @param run    关联的 AgentRun（用于绑定取消回调与事件转发）
-   */
-  start(prompt: string, run: AgentRun): CodexRunHandle {
-    const args = ['exec', prompt, '--json'];
-    const child = spawn(this.command, args, {
-      cwd: this.cwd,
-      env: this.env ? { ...process.env, ...this.env } : undefined,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    let buffer = '';
-    let seq = 0;
-    let finished = false;
-    const eventQueue: AgentEvent[] = [];
-    const waiters: Array<(e: AgentEvent | null) => void> = [];
-
-    const push = (event: AgentEvent) => {
-      if (finished && waiters.length > 0) {
-        const w = waiters.shift()!;
-        w(event);
-      } else {
-        eventQueue.push(event);
-      }
-    };
-
-    const finish = () => {
-      if (finished) return;
-      finished = true;
-      while (waiters.length > 0) {
-        const w = waiters.shift()!;
-        w(null);
-      }
-    };
-
-    const parseLine = (line: string) => {
-      if (!line.trim()) return;
-      try {
-        const data = JSON.parse(line);
-        // 把 Codex JSONL 的事件映射为协议事件
-        const type = data.type || data.event || 'agent:step';
-        const event: AgentEvent = {
-          type: mapEventType(type),
-          sessionId: run.sessionId,
-          seq: ++seq,
-          timestamp: Date.now(),
-          payload: data,
-        };
-        push(event);
-        run.emit(event);
-      } catch {
-        // 非 JSON 行忽略，或发 step 事件作为原始输出
-        const event: AgentEvent = {
-          type: 'agent:step',
-          sessionId: run.sessionId,
-          seq: ++seq,
-          timestamp: Date.now(),
-          payload: { raw: line },
-        };
-        push(event);
-      }
-    };
-
-    child.stdout?.setEncoding('utf8');
-    child.stdout?.on('data', (chunk: string) => {
-      buffer += chunk;
-      let idx;
-      while ((idx = buffer.indexOf('\n')) >= 0) {
-        const line = buffer.slice(0, idx);
-        buffer = buffer.slice(idx + 1);
-        parseLine(line);
-      }
-    });
-
-    child.stderr?.setEncoding('utf8');
-    let stderrAccum = '';
-    child.stderr?.on('data', (chunk: string) => {
-      stderrAccum += chunk;
-    });
-
-    const done = new Promise<number | null>((resolve) => {
-      child.on('close', (code: number | null) => {
-        // 把 buffer 中最后一行
-        if (buffer.trim()) parseLine(buffer);
-        buffer = '';
-        if (code !== 0 && stderrAccum) {
-          // 错误退出码非零，发 failed 事件
-          const ev: AgentEvent = {
-            type: 'agent:failed',
-            sessionId: run.sessionId,
-            seq: ++seq,
-            timestamp: Date.now(),
-            payload: { error: stderrAccum.trim(), exitCode: code },
-          };
-          push(ev);
-          run.fail(stderrAccum.trim());
-        }
-        finish();
-        resolve(code);
+  async execute(request: AgentExecRequest): Promise<AgentExecResult> {
+    if (!request.prompt.trim()) {
+      throw new AgentExecError({
+        code: 'spawn-failed',
+        message: 'Prompt 不能为空。',
       });
-      child.on('error', (err: Error) => {
-        const ev: AgentEvent = {
-          type: 'agent:failed',
-          sessionId: run.sessionId,
-          seq: ++seq,
-          timestamp: Date.now(),
-          payload: { error: err.message },
-        };
-        push(ev);
-        run.fail(err);
-        finish();
-        resolve(null);
+    }
+    if (request.signal?.aborted) {
+      throw new AgentExecError({
+        code: 'cancelled',
+        message: 'Codex 执行已被取消。',
       });
-    });
+    }
 
-    // 绑定 run 的取消 → kill 进程
-    run.onCancel(() => {
-      try {
-        if (child.kill) child.kill('SIGTERM');
-      } catch {
-        // kill 失败忽略
-      }
-    });
+    const sandbox = request.access ?? 'workspace-write';
+    const conversation = request.conversation ?? ({ type: 'new' } as const);
 
-    const events = (async function* () {
-      while (!finished || eventQueue.length > 0) {
-        if (eventQueue.length > 0) {
-          yield eventQueue.shift()!;
-          continue;
-        }
-        if (finished) break;
-        const next = await new Promise<AgentEvent | null>((r) =>
-          waiters.push(r),
+    const args = ['exec'];
+    if (conversation.type === 'resume') args.push('resume');
+    args.push('--json', '--skip-git-repo-check');
+    if (request.extraArgs?.length) args.push(...request.extraArgs);
+    // resume 子命令不支持 --sandbox 标志，需用 config 覆盖
+    if (conversation.type === 'resume') {
+      args.push('-c', `sandbox_mode="${sandbox}"`);
+    } else {
+      args.push('--sandbox', sandbox);
+    }
+    if (request.model) args.push('--model', request.model);
+    if (conversation.type === 'resume') args.push(conversation.id);
+    args.push('-'); // prompt 从 stdin 读取
+
+    let child: ChildProcess;
+    try {
+      child = spawnCli(this.command, args, { cwd: request.cwd, env: this.env });
+    } catch (error) {
+      throw new AgentExecError({
+        code: 'spawn-failed',
+        message:
+          error instanceof Error
+            ? `无法启动 codex（${this.command}）：${error.message}`
+            : '无法启动 codex 进程。',
+      });
+    }
+
+    // 早退（如 ENOENT）时 stdin 写入会 EPIPE，忽略由 exit 路径统一报错
+    child.stdin?.on('error', () => undefined);
+    child.stdin?.end(request.prompt);
+
+    const signal = request.signal;
+    const terminate = () => terminateTree(child);
+    signal?.addEventListener('abort', terminate, { once: true });
+
+    try {
+      let conversationId =
+        conversation.type === 'resume' ? conversation.id : undefined;
+      let finalMessage: string | undefined;
+      let usage: Record<string, unknown> | undefined;
+      let turnFailure: { code: string; message: string } | undefined;
+
+      const handleLine = (line: string) => {
+        const threadId = parseCodexThreadId(line);
+        if (threadId) conversationId = threadId;
+        const event = parseCodexJsonlEvent(line);
+        if (!event) return;
+        if (event.type === 'message') finalMessage = event.text;
+        else if (event.type === 'turn-completed') usage = event.usage;
+        else if (event.type === 'turn-failed') turnFailure = event.error;
+        request.onEvent?.(event);
+      };
+
+      let spawnError: Error | undefined;
+      const exitPromise = new Promise<{
+        code: number | null;
+        signal: string | null;
+      }>((resolve, reject) => {
+        child.once('error', (err) => {
+          spawnError = err;
+          reject(err);
+        });
+        child.once('close', (code, signal2) =>
+          resolve({ code, signal: signal2 }),
         );
-        if (next === null) break;
-        yield next;
+      });
+
+      let stderr = '';
+      const stderrDone = readStream(child.stderr, (text) => {
+        stderr += text;
+        if (stderr.length > MAX_STDERR_LENGTH) {
+          stderr = stderr.slice(-MAX_STDERR_LENGTH);
+        }
+      }).catch(() => undefined);
+
+      const stdoutDone = readLines(child.stdout, handleLine).catch(
+        () => undefined,
+      );
+
+      let exit: { code: number | null; signal: string | null };
+      try {
+        const results = await Promise.allSettled([
+          exitPromise,
+          stdoutDone,
+          stderrDone,
+        ]);
+        exit =
+          results[0].status === 'fulfilled'
+            ? results[0].value
+            : { code: null, signal: null };
+      } catch {
+        exit = { code: null, signal: null };
       }
-    })();
 
-    return {
-      events,
-      cancel: () => run.cancel(),
-      done,
-    };
-  }
+      if (signal?.aborted) {
+        throw new AgentExecError({
+          code: 'cancelled',
+          message: 'Codex 执行已被取消。',
+        });
+      }
+      if (spawnError) {
+        throw new AgentExecError({
+          code: 'spawn-failed',
+          message: `无法启动 codex（${this.command}）：${spawnError.message}。请确认已安装 codex CLI（npm i -g @openai/codex）并完成 codex login，或设置 CODEX_CLI_PATH 环境变量。`,
+        });
+      }
+      if (turnFailure) {
+        throw new AgentExecError({
+          code: 'turn-failed',
+          message: turnFailure.message,
+        });
+      }
+      if (exit.code !== 0) {
+        throw new AgentExecError({
+          code: 'nonzero-exit',
+          message:
+            stderr.trim() ||
+            `codex 进程异常退出（exit code ${exit.code ?? 'null'}）。`,
+          exitCode: exit.code,
+          stderr,
+        });
+      }
+      if (!conversationId) {
+        throw new AgentExecError({
+          code: 'missing-conversation-id',
+          message: 'codex 未输出 thread_id。',
+        });
+      }
+      if (finalMessage === undefined) {
+        throw new AgentExecError({
+          code: 'missing-message',
+          message: 'codex 未输出最终消息。',
+        });
+      }
 
-  /**
-   * 兼容旧接口：单次完整执行并返回最终 completed/failed 事件 */
-  async complete(command: AgentCommand): Promise<AgentEvent> {
-    // 兼容占位版：旧方法直接执行完后取最后一个事件
-    return {
-      type: 'agent:completed',
-      sessionId: command.sessionId,
-      seq: 0,
-      timestamp: Date.now(),
-      payload: {},
-    };
-  }
-}
+      let json: unknown;
+      if (request.responseFormat === 'json') {
+        try {
+          json = extractJson(finalMessage);
+        } catch {
+          throw new AgentExecError({
+            code: 'invalid-json',
+            message: 'codex 最终输出不是合法 JSON。',
+          });
+        }
+      }
 
-function mapEventType(type: string): AgentEvent['type'] {
-  switch (type) {
-    case 'start':
-    case 'started':
-      return 'agent:started';
-    case 'plan':
-    case 'planning':
-      return 'agent:plan';
-    case 'step':
-    case 'progress':
-    case 'delta':
-      return 'agent:step';
-    case 'complete':
-    case 'completed':
-    case 'done':
-      return 'agent:completed';
-    case 'error':
-    case 'failed':
-      return 'agent:failed';
-    default:
-      return 'agent:step';
+      return { conversationId, text: finalMessage, json, usage };
+    } finally {
+      signal?.removeEventListener('abort', terminate);
+    }
   }
 }

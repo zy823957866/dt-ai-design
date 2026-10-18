@@ -2,6 +2,8 @@ import { useEditorState } from '@/lib/editor';
 
 import { Canvas } from '../canvas/Canvas';
 import { Toolbar } from './Toolbar';
+import { PenSubToolbar } from './toolbar/PenSubToolbar';
+import { useToolShortcuts } from './toolbar/useToolShortcuts';
 
 /**
  * Canvas stage orchestrator.
@@ -21,11 +23,13 @@ export function EditorCanvasStage() {
   // (interaction overlay, selection handles, creation preview) will read from it.
   const _state = useEditorState();
   void _state;
+  useToolShortcuts();
 
   return (
     <div className="relative h-full w-full" data-region="editor-canvas-stage">
       <Canvas />
       <Toolbar />
+      <PenSubToolbar />
     </div>
   );
 }
